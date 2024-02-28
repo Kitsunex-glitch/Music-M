@@ -195,7 +195,7 @@
             Controls.Add(progressBar1);
             FormBorderStyle = FormBorderStyle.FixedSingle;
             Icon = (Icon)resources.GetObject("$this.Icon");
-            Name = "Setup";
+            Name = "Setup Music M";
             Text = "Установщик Music M";
             Load += Form1_Load;
             ResumeLayout(false);
