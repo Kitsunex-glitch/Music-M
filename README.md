@@ -1,4 +1,4 @@
-[Скачать установщик](https://github.com/Kitsunex-glitch/Music-M/releases/download/0.1.5.2/Setup.VK.M.exe)
+[Скачать установщик](https://github.com/Kitsunex-glitch/Music-M/releases/download/0.1.5.6/Setup.exe)
 
 ![image](https://github.com/Kitsunex-glitch/Music-M/assets/43302537/1c1cc594-1f86-4613-acd2-cf71870018f3)
 
