@@ -40,8 +40,6 @@ namespace SetupLib
 
         public async Task<bool> CheckForUpdates()
         {
-            
-
             var releases = await client.Repository.Release.GetAll("Kitsunex-glitch", "Music-M");
        
             foreach (var release in releases)
