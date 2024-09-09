@@ -103,7 +103,7 @@ namespace VK_UI3
         /// <param name="args">Details about the launch request and process.</param>
         protected override async void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
         {
-            const string mutexName = "VKMKitsunex-glitchApp";
+            const string mutexName = "MusicMApps";
             bool createdNew;
             
             setThemeApp();
