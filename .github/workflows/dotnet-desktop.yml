@@ -68,9 +68,9 @@ jobs:
 
     - name: Обновить TOKEN_STAT_DEFAULT_GATE
       run: |
-        $content = Get-Content -Path "D:\a\$repoName\$repoName\VKU3\VK UI3\StaticParams.cs"
+        $content = Get-Content -Path "D:\a\$repoName\$repoName\VK U3\VK UI3\StaticParams.cs"
         $updatedContent = $content -replace 'Environment.GetEnvironmentVariable\("TOKEN_STAT_DEFAULT_GATE"\)', $env:TOKEN_STAT_DEFAULT_GATE
-        Set-Content -Path "D:\a\$repoName\$repoName\VKU3\VK UI3\StaticParams.cs" -Value $updatedContent
+        Set-Content -Path "D:\a\$repoName\$repoName\VK U3\VK UI3\StaticParams.cs" -Value $updatedContent
 
 
     # Install the .NET Core workload
