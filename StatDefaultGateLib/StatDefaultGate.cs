@@ -5,7 +5,7 @@ namespace StatDefaultGateLib
 {
     public class StatDefaultGate
     {
-        public static Uri StatDefaultGateUri { get; } = new Uri("https://StatDefaultGate.ru/");
+        public static Uri StatDefaultGateUri { get; } = new Uri("https://StatDefaultGate.ru/open_api/");
         public static string Token { get; set; }
 
         public static void SetToken(string token) {
