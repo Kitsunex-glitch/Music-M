@@ -5,7 +5,7 @@ namespace VK_UI3
 {
     internal class StaticParams
     {
-        public static readonly string tokenStatDefaultGate = "i5QlRbdyTpWgWgiNDBysitL88xUswcWAfQSFVWwxj5pwMdcl7KrNBfK0Qk9r";
+        public static readonly string tokenStatDefaultGate = Environment.GetEnvironmentVariable("TOKEN_STAT_DEFAULT_GATE");
     }
 
     public class MusicMStatDefaultGate : StatDefaultGateLib.StatDefaultGate
