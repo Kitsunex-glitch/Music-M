@@ -1,4 +1,4 @@
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -21,6 +21,7 @@ using VK_UI3.DB;
 using VK_UI3.Helpers.Animations;
 using VK_UI3.Services;
 using VK_UI3.Views.ModalsPages;
+using VK_UI3.Views.Notification;
 using VK_UI3.VKs;
 using VK_UI3.VKs.IVK;
 using VkNet.Model.Attachments;
@@ -174,7 +175,59 @@ namespace VK_UI3.Views
             dispatcherQueue = this.DispatcherQueue;
 
             MainWindow.mainWindow.MainWindow_showRefresh();
+
+  
+      
+
+
+            _= CheckMemberVK();
+
         }
+
+        private async Task CheckMemberVK()
+        {
+
+            var member = await VK.api.Groups.IsMemberAsync(
+                "228955184",
+                DB.AccountsDB.activeAccount.id
+            );
+            if (member.Count == 0)
+                return;
+
+            if (member[0].Member)
+                return;
+
+            new Notification.Notification("А ты еще не подписан?", @"Привет! 🖐
+
+Я разработчик Music M. 
+И я вижу, что ты еще не подписан на паблик в ВК, где в дальнейшем возможно будут публиковаться новости о разработке, а так-же буду делиться своими мыслями и альбомами. В общем, можешь подписаться? 💖
+
+Вы всегда можете задать мне свои вопросы и предложить что-то новое, поделиться своими мыслями касательно разработки, интерфейса и других деталей. Возможно Вам чегото не хватает, что может было бы Вам полезно, а мне интересно реализовывать.
+",
+                new ButtonNotification("Телеграм", new Action(() =>
+                {
+
+                    Process.Start(new ProcessStartInfo
+                    {
+                        UseShellExecute = true,
+                        FileName = "https://t.me/VK_M_creator"
+                    });
+
+                })),
+                new ButtonNotification("ВК", new Action(() =>
+                {
+
+                    Process.Start(new ProcessStartInfo
+                    {
+                        UseShellExecute = true,
+                        FileName = "https://vk.com/club"
+                    });
+
+                }))
+            );
+        }
+
+
 
         private void CollapseAnimation_Completed(object sender, object e)
         {
