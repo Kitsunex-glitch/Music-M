@@ -186,38 +186,6 @@ namespace VK_UI3.Views
 
         private async Task CheckMemberVK()
         {
-
-            new Notification.Notification("А ты еще не подписан?", @"Привет! 🖐
-
-Я разработчик Music M. 
-И я вижу, что ты еще не подписан на паблик в ВК, где в дальнейшем возможно будут публиковаться новости о разработке, а так-же буду делиться своими мыслями и альбомами. В общем, можешь подписаться? 💖
-
-Вы всегда можете задать мне свои вопросы и предложить что-то новое, поделиться своими мыслями касательно разработки, интерфейса и других деталей. Возможно Вам чегото не хватает, что может было бы Вам полезно, а мне интересно реализовывать.
-
-У нас так-же есть ТГ канал, куда публикуются новости о разработке, уведомления о релизе новых версий и некоторые другие вещи. 🚀
-",
-                new ButtonNotification("Телеграм", new Action(() =>
-                {
-
-                    Process.Start(new ProcessStartInfo
-                    {
-                        UseShellExecute = true,
-                        FileName = "https://t.me/VK_M_creator"
-                    });
-
-                }), true),
-                new ButtonNotification("ВК", new Action(() =>
-                {
-
-                    Process.Start(new ProcessStartInfo
-                    {
-                        UseShellExecute = true,
-                        FileName = "https://vk.com/club"
-                    });
-
-                }), true)
-            );
-
             var member = await VK.api.Groups.IsMemberAsync(
                 "",
                 DB.AccountsDB.activeAccount.id
