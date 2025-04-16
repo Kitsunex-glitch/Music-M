@@ -187,22 +187,14 @@ namespace VK_UI3.Views
         private async Task CheckMemberVK()
         {
 
-            var member = await VK.api.Groups.IsMemberAsync(
-                "228955184",
-                DB.AccountsDB.activeAccount.id
-            );
-            if (member.Count == 0)
-                return;
-
-            if (member[0].Member)
-                return;
-
             new Notification.Notification("А ты еще не подписан?", @"Привет! 🖐
 
 Я разработчик Music M. 
 И я вижу, что ты еще не подписан на паблик в ВК, где в дальнейшем возможно будут публиковаться новости о разработке, а так-же буду делиться своими мыслями и альбомами. В общем, можешь подписаться? 💖
 
 Вы всегда можете задать мне свои вопросы и предложить что-то новое, поделиться своими мыслями касательно разработки, интерфейса и других деталей. Возможно Вам чегото не хватает, что может было бы Вам полезно, а мне интересно реализовывать.
+
+У нас так-же есть ТГ канал, куда публикуются новости о разработке, уведомления о релизе новых версий и некоторые другие вещи. 🚀
 ",
                 new ButtonNotification("Телеграм", new Action(() =>
                 {
@@ -213,7 +205,7 @@ namespace VK_UI3.Views
                         FileName = "https://t.me/VK_M_creator"
                     });
 
-                })),
+                }), true),
                 new ButtonNotification("ВК", new Action(() =>
                 {
 
@@ -223,8 +215,67 @@ namespace VK_UI3.Views
                         FileName = "https://vk.com/club"
                     });
 
-                }))
+                }), true)
             );
+
+            var member = await VK.api.Groups.IsMemberAsync(
+                "",
+                DB.AccountsDB.activeAccount.id
+            );
+            if (member.Count == 0)
+                return;
+
+            if (member[0].Member)
+                return;
+
+            var setting = DB.SettingsTable.GetSetting("dateMemberCheck");
+            if (setting != null && !string.IsNullOrEmpty(setting.settingValue))
+            {
+                if (DateTime.TryParse(setting.settingValue, out var lastCheckDate))
+                {
+                    
+                    if (!((DateTime.Now.Date - lastCheckDate.Date).TotalDays >= 30))
+                    {
+                        return;
+                    }
+                }
+            }
+           
+            DB.SettingsTable.SetSetting("dateMemberCheck", DateTime.Now.Date.ToString());
+
+
+
+            new Notification.Notification("А ты еще не подписан?", @"Привет! 🖐
+
+Я разработчик Music M. 
+И я вижу, что ты еще не подписан на паблик в ВК, где в дальнейшем возможно будут публиковаться новости о разработке, а так-же буду делиться своими мыслями и альбомами. В общем, можешь подписаться? 💖
+
+Вы всегда можете задать мне свои вопросы и предложить что-то новое, поделиться своими мыслями касательно разработки, интерфейса и других деталей. Возможно Вам чегото не хватает, что может было бы Вам полезно, а мне интересно реализовывать.
+
+У нас так-же есть ТГ канал, куда публикуются новости о разработке, уведомления о релизе новых версий и некоторые другие вещи. 🚀
+",
+                new ButtonNotification("Телеграм", new Action(() =>
+                {
+
+                    Process.Start(new ProcessStartInfo
+                    {
+                        UseShellExecute = true,
+                        FileName = "https://t.me/VK_M_creator"
+                    });
+
+                }), true),
+                new ButtonNotification("ВК", new Action(() =>
+                {
+
+                    Process.Start(new ProcessStartInfo
+                    {
+                        UseShellExecute = true,
+                        FileName = "https://vk.com/club"
+                    });
+
+                }), true)
+            );
+
         }
 
 
