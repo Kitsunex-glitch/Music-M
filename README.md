@@ -1,3 +1,6 @@
+[![TotalDownloads](https://img.shields.io/github/downloads/Kitsunex-glitch/Music-M/total?label=Загрузок)](https://github.com/Kitsunex-glitch/Music-M/releases "Download")
+[![OS - Windows](https://img.shields.io/badge/OS-Windows-blue?logo=windows&logoColor=white)](https://github.com/Kitsunex-glitch/Music-M/releases "Download")
+
 ## Описание
 Music M — это абсолютно бесплатное приложение для прослушивания музыки в социальной сети VK.
 Music M - По сути своей адаптация VK X и Music X, перенесённый на интерфейс WinUI3. По этому, в нём много схожестей.
