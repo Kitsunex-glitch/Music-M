@@ -29,121 +29,140 @@ on:
 
 jobs:
   build:
+    strategy:
+      matrix:
+        # Указание архитектур для сборки
+        rid: [win-x64, win-x86, win-arm64]
+
     runs-on: windows-latest
 
     env:
+      # Имя проекта для сборки
       Project_Name: "VK UI3"
-      Output_Dir: "${{ github.workspace }}\Output"
-      Configuration: "Unpacked"
+      # Имя решения
+      Solution_Name: "VK UI3.sln"
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          node-version: 16
           fetch-depth: 0
 
-      # Устанавливаем .NET 8.x вместо 9.x
-      - name: Setup .NET 8.x
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
-      # Устанавливаем необходимые workload'ы
-      - name: Install required workloads
+      # Декодируем закодированный в base64 pfx и сохраняем Signing_Certificate
+      - name: Decode the pfx
         run: |
-          dotnet workload install wasm-tools
-          dotnet workload install maui
-          dotnet workload install windowsdesktop
+          $pfx_cert_byte = [System.Convert]::FromBase64String("${{ secrets.BASE64_ENCODED_PFX }}")
+          $certificatePath = "${{ github.workspace }}\GitHubActionsWorkflow.pfx"
+          [IO.File]::WriteAllBytes("$certificatePath", $pfx_cert_byte)
 
-      - name: Restore NuGet packages
-        run: dotnet restore "$env:Project_Name/$env:Project_Name.csproj"
-
+      # Обновить TOKEN_STAT_DEFAULT_GATE
       - name: Обновить TOKEN_STAT_DEFAULT_GATE
         run: |
-          $content = Get-Content -Path "$env:Project_Name/StaticParams.cs" -ErrorAction SilentlyContinue
-          if ($content) {
-            $updatedContent = $content -replace 'Environment.GetEnvironmentVariable\("TOKEN_STAT_DEFAULT_GATE"\)', '"${{ secrets.TOKEN_STAT_DEFAULT_GATE }}"'
-            Set-Content -Path "$env:Project_Name/StaticParams.cs" -Value $updatedContent
-            Write-Output $updatedContent
-          }
+          $repoName = "${{ github.repository }}".Split('/')[1]
+          $content = Get-Content -Path "D:\a\$repoName\$repoName\VK UI3\StaticParams.cs"
+          $updatedContent = $content -replace 'Environment.GetEnvironmentVariable\("TOKEN_STAT_DEFAULT_GATE"\)', '"${{ secrets.TOKEN_STAT_DEFAULT_GATE }}"'
+          Set-Content -Path "D:\a\$repoName\$repoName\VK UI3\StaticParams.cs" -Value $updatedContent
+          Write-Output $updatedContent
 
-      - name: Build and Publish for all platforms
+      # Установить .NET Core
+      - name: Install .NET Core
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+          
+      # Добавить MSBuild в PATH
+      - name: Setup MSBuild.exe
+        uses: microsoft/setup-msbuild@v2
+
+      # Восстановить зависимости
+      - name: Restore dependencies
+        run: dotnet restore ${{ env.Project_Name }}\${{ env.Project_Name }}.csproj
+
+      # Устанавливаем сертификат, чтобы signtool мог его найти
+      - name: Install PFX certificate
         run: |
-          # Явно указываем использовать .NET 8.x
-          $env:DOTNET_ROOT = "C:\Program Files\dotnet\sdk\8.0.400"
+          $certificatePath = "${{ github.workspace }}\GitHubActionsWorkflow.pfx"
+          $password = ConvertTo-SecureString -String "${{ secrets.PFX_PASSWORD }}" -Force -AsPlainText
+          Import-PfxCertificate -FilePath $certificatePath -CertStoreLocation Cert:\LocalMachine\My -Password $password
 
-          $platforms = @(
-            @{ Platform="x64"; Runtime="win-x64" },
-            @{ Platform="x86"; Runtime="win-x86" },
-            @{ Platform="ARM64"; Runtime="win-arm64" }
-          )
-
-          foreach ($platform in $platforms) {
-            Write-Host "Сборка для платформы $($platform.Platform)..."
-
-            # Очистка предыдущих выходных данных
-            Remove-Item -Path "bin\$($platform.Platform)\$env:Configuration" -Recurse -Force -ErrorAction SilentlyContinue
-            Remove-Item -Path "obj\$($platform.Platform)\$env:Configuration" -Recurse -Force -ErrorAction SilentlyContinue
-
-            # Сборка с явным указанием версии .NET
-            & "$env:DOTNET_ROOT\dotnet.exe" build "$env:Project_Name/$env:Project_Name.csproj" `
-              -c $env:Configuration `
-              -p:Platform=$($platform.Platform) `
-              -p:WindowsPackageType=None `
-              -p:SelfContained=true `
-              -p:WindowsAppSDKSelfContained=true `
-              -p:RuntimeIdentifier=$($platform.Runtime) `
-              -p:UseWindowsAppSDK=true `
-              -p:WindowsAppSDKSelfContainedDeployment=true
-
-            # Публикация
-            $outputDir = "$env:Output_Dir\$($platform.Platform)\$env:Configuration"
-            New-Item -ItemType Directory -Path $outputDir -Force
-            & "$env:DOTNET_ROOT\dotnet.exe" publish "$env:Project_Name/$env:Project_Name.csproj" `
-              -c $env:Configuration `
-              -r $($platform.Runtime) `
-              --self-contained true `
-              -p:WindowsPackageType=None `
-              -p:WindowsAppSDKSelfContained=true `
-              -p:Platform=$($platform.Platform) `
-              -p:UseWindowsAppSDK=true `
-              -p:WindowsAppSDKSelfContainedDeployment=true `
-              -o $outputDir
-
-            # Архивирование
-            $zipPath = "$env:Output_Dir\VK_UI3_Unpacked_$($platform.Platform).zip"
-            Compress-Archive -Path "$outputDir\*" -DestinationPath $zipPath -Force
-
-            Write-Host "Сборка для платформы $($platform.Platform) завершена"
+      # Сборка, публикация и подпись исполняемого файла
+      - name: Build, Sign, and Zip the executable
+        env:
+          SIGN_PASSWORD: ${{ secrets.PFX_PASSWORD }}
+        run: |
+          $projectFile = "${{ env.Project_Name }}\${{ env.Project_Name }}.csproj"
+          $outputDir = "build_output"
+          
+          # Публикуем приложение как автономный исполняемый файл
+          dotnet publish `
+            $projectFile `
+            -c Unpacked `
+            -r ${{ matrix.rid }} `
+            --self-contained true `
+            -o "$outputDir" `
+            /p:PublishSingleFile=true
+            
+          $exePath = Get-ChildItem -Path "$outputDir" -Filter "*.exe" | Select-Object -First 1 | ForEach-Object { $_.FullName }
+          
+          if (-not $exePath) {
+            throw "Исполняемый файл не найден в $outputDir"
           }
+          
+          # Подписываем исполняемый файл
+          $signToolPath = (Get-Item "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe").FullName | Select-Object -First 1
+          
+          if ($signToolPath) {
+            Write-Host "Найден Signtool: $signToolPath"
+            & "$signToolPath" sign /f "${{ github.workspace }}\GitHubActionsWorkflow.pfx" /p "${{ secrets.PFX_PASSWORD }}" /t http://timestamp.digicert.com /v $exePath
+          } else {
+            Write-Host "Signtool не найден. Подпись пропущена."
+          }
+          
+          # Упаковываем в ZIP-архив
+          $zipName = "${{ env.Project_Name }}_${{ matrix.rid }}.zip"
+          Compress-Archive -Path "$outputDir\*" -DestinationPath "$zipName" -Force
+          
+          # Сохраняем путь к ZIP-архиву как переменную среды, чтобы использовать в следующем шаге
+          echo "::set-output name=zip_file_path::$zipName"
+          echo "::set-output name=zip_file_name::$zipName"
 
-      - name: Upload Artifacts
+      # Удалить pfx
+      - name: Remove the pfx
+        run: |
+          $certificatePath = "${{ github.workspace }}\GitHubActionsWorkflow.pfx"
+          Remove-Item -path "$certificatePath"
+      
+      # Загружаем ZIP-архивы как артефакты сборки
+      - name: Upload zip artifact
         uses: actions/upload-artifact@v4
         with:
-          name: VK_UI3_Unpacked_All
-          path: |
-            ${{ env.Output_Dir }}\VK_UI3_Unpacked_x64.zip
-            ${{ env.Output_Dir }}\VK_UI3_Unpacked_x86.zip
-            ${{ env.Output_Dir }}\VK_UI3_Unpacked_ARM64.zip
+          name: Executable ${{ matrix.rid }}
+          path: "*.zip"
 
-      # Остальные шаги (версия, релиз, телеграм) остаются без изменений
+      # === Шаги для создания релиза и уведомлений ===
+      
       - name: Извлечь версию
         id: get_version
         run: |
-          $csprojPath = "$env:Project_Name/$env:Project_Name.csproj"
-          [xml]$doc = Get-Content $csprojPath
-          $version = $doc.Project.PropertyGroup.AppxPackageVersion
-          if (-not $version) {
-            $version = $doc.Project.PropertyGroup.Version
-          }
-          echo "version=$version" >> $GITHUB_OUTPUT
+          $repoName = "${{ github.repository }}".Split('/')[1]
+          $csprojPath = "D:\a\$repoName\$repoName\${{ env.Project_Name }}\${{ env.Project_Name }}.csproj"
+          $doc = New-Object xml
+          $doc.Load((Convert-Path $csprojPath))
+          # Ищем тег <Version>
+          $version = $doc.SelectSingleNode('//Version').InnerText
+          echo "::set-output name=VERSION::$version"
           echo "Версия: $version"
+        continue-on-error: true
         if: github.event.inputs.release == 'true'
 
+      - name: Вывести версию
+        run: |
+          echo "Извлеченная версия: ${{ steps.get_version.outputs.VERSION }}"
       - name: Проверить существование релиза
         id: check_release
         run: |
-          $version = "${{ steps.get_version.outputs.version }}"
+          $version = "${{ steps.get_version.outputs.VERSION }}"
           $headers = @{
             "Authorization" = "token ${{ secrets.TOKEN }}"
           }
@@ -151,11 +170,12 @@ jobs:
           $release = $releases | Where-Object { $_.tag_name -eq $version -and $_.draft -eq $false -and $_.prerelease -eq $false }
           if ($release) {
             Write-Host "Релиз с тегом $version уже существует"
-            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "::set-output name=exists::true"
           } else {
             Write-Host "Релиз с тегом $version не найден"
-            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "::set-output name=exists::false"
           }
+        shell: pwsh
         if: github.event.inputs.release == 'true'
 
       - name: Создать релиз
@@ -164,7 +184,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
         with:
-          tag_name: ${{ steps.get_version.outputs.version }}
+          tag_name: ${{ steps.get_version.outputs.VERSION }}
           release_name: ${{ github.event.inputs.namevers }}
           body: ${{ github.event.inputs.descr }}
           draft: false
@@ -175,9 +195,8 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.TOKEN }}
-          file: ${{ env.Output_Dir }}\VK_UI3_Unpacked_*.zip
-          asset_name: VK_UI3_Unpacked
-          tag: ${{ steps.get_version.outputs.version }}
+          file: "*.zip"
+          tag: ${{ steps.get_version.outputs.VERSION }}
           overwrite: true
           file_glob: true
         if: steps.check_release.outputs.exists == 'false' && github.event.inputs.release == 'true'
@@ -186,14 +205,14 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/${{ steps.get_version.outputs.version }}
+          RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/${{ steps.get_version.outputs.VERSION }}
         run: |
           $telegramBotToken = '${{ secrets.TELEGRAM_BOT_TOKEN }}'
           $telegramChatId = '${{ secrets.TELEGRAM_CHAT_ID }}'
-          $releaseUrl = 'https://github.com/${{ github.repository }}/releases/tag/${{ steps.get_version.outputs.version }}'
+          $releaseUrl = 'https://github.com/${{ github.repository }}/releases/tag/${{ steps.get_version.outputs.VERSION }}'
           $message = @"
           <b>🎉 Новый релиз:</b> ${{ github.event.inputs.namevers }}
-          <b>📦 Версия:</b> ${{ steps.get_version.outputs.version }}
+          <b>📦 Версия:</b> ${{ steps.get_version.outputs.VERSION }}
           <b>📝 Описание:</b> ${{ github.event.inputs.descr }}
           <b>🔗 <a href='$releaseUrl'>Ссылка на релиз</a></b>
           "@
