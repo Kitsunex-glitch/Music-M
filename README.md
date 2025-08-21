@@ -29,7 +29,7 @@ Music M - По сути своей адаптация VK X и Music X, пере�
 
 ## Установщики
 
-[X64 - полная версия установщика](https://github.com/Kitsunex-glitch/Music-M/releases/download/0.3.4.6/Setup-FULL.X86.exe) - подойдёт большинству, автоматическая установка библиотек
+[X64 - полная версия установщика](https://github.com/Kitsunex-glitch/Music-M/releases/download/0.3.4.6/Setup-FULL.X86.exe) - подойдёт большинству, автоматическая установка библиотек. Просто качайте это, если не знаете что качать.
 
 [X64 - урезанная версия установщика ](https://github.com/Kitsunex-glitch/Music-M/releases/download/0.3.4.6/Setup-SLIM.X86.exe) - подойдёт большинству, придётся ручками ставить библиотеку .NET
 
