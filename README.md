@@ -29,14 +29,14 @@ Music M - По сути своей адаптация VK X и Music X, пере�
 
 ## Установщики
 
-[X64 - полная версия установщика](https://github.com/Kitsunex-glitch/Music-M/releases/download/0.3.3.3/Setup-FULL.X86.exe) - подойдёт большинству, автоматическая установка библиотек
+[X64 - полная версия установщика](https://github.com/Kitsunex-glitch/Music-M/releases/download/0.3.4.6/Setup-FULL.X86.exe) - подойдёт большинству, автоматическая установка библиотек
 
-[X64 - урезанная версия установщика ](https://github.com/Kitsunex-glitch/Music-M/releases/download/0.3.3.3/Setup-SLIM.X86.exe) - подойдёт большинству, придётся ручками ставить библиотеку .NET
+[X64 - урезанная версия установщика ](https://github.com/Kitsunex-glitch/Music-M/releases/download/0.3.4.6/Setup-SLIM.X86.exe) - подойдёт большинству, придётся ручками ставить библиотеку .NET
 
 
-[ARM64 - полная версия установщика](https://github.com/Kitsunex-glitch/Music-M/releases/download/0.3.3.3/Setup-FULL.ARM64.exe) - подойдёт владельцам процессора ARM64, автоматическая установка библиотек
+[ARM64 - полная версия установщика](https://github.com/Kitsunex-glitch/Music-M/releases/download/0.3.4.6/Setup-FULL.ARM64.exe) - подойдёт владельцам процессора ARM64, автоматическая установка библиотек
 
-[ARM64 - урезанная версия установщика](https://github.com/Kitsunex-glitch/Music-M/releases/download/0.3.3.3/Setup-SLIM.ARM64.exe) - подойдёт владельцам процессора ARM64, придётся ручками ставить библиотеку .NET
+[ARM64 - урезанная версия установщика](https://github.com/Kitsunex-glitch/Music-M/releases/download/0.3.4.6/Setup-SLIM.ARM64.exe) - подойдёт владельцам процессора ARM64, придётся ручками ставить библиотеку .NET
 
 ## Скриншоты
 ![image](https://github.com/user-attachments/assets/6525ad2f-18c8-48c4-8605-ad68c118702a)
