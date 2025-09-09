@@ -270,7 +270,7 @@ namespace VK_UI3.Views
                     Process.Start(new ProcessStartInfo
                     {
                         UseShellExecute = true,
-                        FileName = "https://vk.com/club"
+                        FileName = "https://vk.ru/club"
                     });
 
                 }), true)
@@ -378,7 +378,7 @@ namespace VK_UI3.Views
 
 
                     token.ThrowIfCancellationRequested();
-                    var updatesSection = await VK.vkService.GetAudioCatalogAsync("https://vk.com/audio?section=updates");
+                    var updatesSection = await VK.vkService.GetAudioCatalogAsync("https://vk.ru/audio?section=updates");
 
                     token.ThrowIfCancellationRequested();
                     if (updatesSection.Catalog?.Sections?.Count > 0)
