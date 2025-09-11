@@ -139,9 +139,19 @@ namespace SetupLib.Services
             }
             else // PackageType.ZIP
             {
-                // Определяем путь к Program Files на системном диске
-                string programFilesPath = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-                string extractPath = Path.Combine(programFilesPath, "Music M");
+                string extractPath;
+                if (PathInstallZIP == null)
+                {
+                    // Определяем путь к Program Files на системном диске
+                    string programFilesPath = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+                    extractPath = Path.Combine(programFilesPath, "Music M");
+
+                }
+                else
+                                    {
+                    // Используем указанный путь
+                    extractPath = PathInstallZIP;
+                }
                 command = GetZipInstallCommand(destinationPath, extractPath);
             }
 
