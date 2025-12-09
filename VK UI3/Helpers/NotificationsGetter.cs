@@ -20,12 +20,12 @@ namespace VK_UI3.Helpers
         public string Url { get; set; }
     }
 
-    internal class Notifications
+    internal class NotificationsGetter
     {
         private const string NotificationsUrl = "https://vkm.example.com/notifications.json";
         private HttpClient _client;
 
-        public Notifications()
+        public NotificationsGetter()
         {
             _client = new HttpClient();
             // Можно добавить таймаут при необходимости
