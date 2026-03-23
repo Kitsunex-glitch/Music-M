@@ -48,7 +48,6 @@ jobs:
           node-version: 16
           fetch-depth: 0
 
-      # Декодируем закодированный в base64 pfx и сохраняем Signing_Certificate
       - name: Decode the pfx
         run: |
           $pfx_cert_byte = [System.Convert]::FromBase64String("${{ secrets.BASE64_ENCODED_PFX }}")
@@ -61,19 +60,12 @@ jobs:
           $content = Get-Content -Path "D:\a\$repoName\$repoName\VK UI3\StaticParams.cs"
           $updatedContent = $content -replace 'Environment.GetEnvironmentVariable\("TOKEN_STAT_DEFAULT_GATE"\)', '"${{ secrets.TOKEN_STAT_DEFAULT_GATE }}"'
           Set-Content -Path "D:\a\$repoName\$repoName\VK UI3\StaticParams.cs" -Value $updatedContent
-          Write-Output $updatedContent
           
-      - name: Display disk tree
-        run: |
-          Get-ChildItem -Recurse | Sort-Object Length -Descending
-          
-      # Установить .NET Core
       - name: Install .NET Core
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
 
-      # Добавить MSBuild в PATH
       - name: Setup MSBuild.exe
         uses: microsoft/setup-msbuild@v2
 
@@ -86,8 +78,6 @@ jobs:
           $doc.Load((Convert-Path $csprojPath))
           $version = $doc.SelectSingleNode('//AppxPackageVersion').InnerText
           echo "::set-output name=VERSION::$version"
-          echo "Версия: $version"
-        continue-on-error: true
 
       - name: Подставить версию в Package.appxmanifest
         run: |
@@ -99,21 +89,12 @@ jobs:
           [xml]$xml = Get-Content $manifest
           $xml.Package.Identity.Version = $version
           $xml.Save($manifest)
-          
-      - name: Clean publish directories
-        run: |
-          Remove-Item -Recurse -Force publish-x64, publish-x86, publish-arm64 -ErrorAction SilentlyContinue
 
-      # Восстановить приложение для заполнения папки obj RuntimeIdentifiers
       - name: Restore the application
         run: msbuild $env:Solution_Name /t:Restore /p:Configuration=$env:Configuration /clp:Minimal
         env:
           Configuration: ${{ matrix.configuration }}
 
-      - name: Print working directory
-        run: |
-          Write-Host "Current working directory: $(Get-Location)"
-          
       - name: Get Certificate Thumbprint and Replace in Project File
         run: |
           $pfx_cert_byte = [System.Convert]::FromBase64String("${{ secrets.BASE64_ENCODED_PFX }}")
@@ -121,7 +102,6 @@ jobs:
           [IO.File]::WriteAllBytes("$certificatePath", $pfx_cert_byte)
           $pfxPassword = ConvertTo-SecureString -String "${{ secrets.PFX_PASSWORD }}" -AsPlainText -Force
           $pfxCert = Get-PfxCertificate -FilePath $certificatePath -Password $pfxPassword
-          Write-Host "Certificate Thumbprint: $($pfxCert.Thumbprint)"
           $projectFile = "VK UI3 (Package)/VK UI3 (Package).wapproj"
           $content = Get-Content -Path $projectFile -Raw
           $content = $content -replace '(?<=<PackageCertificateThumbprint>).+?(?=</PackageCertificateThumbprint>)', $pfxCert.Thumbprint
@@ -133,12 +113,51 @@ jobs:
           $password = ConvertTo-SecureString -String "${{ secrets.PFX_PASSWORD }}" -Force -AsPlainText
           Import-PfxCertificate -FilePath $certificatePath -CertStoreLocation Cert:\LocalMachine\My -Password $password
           
-      # Создание пакета приложения
-      - name: Create the app package
+      # ШАГ 1: Сначала собираем все платформы отдельно (чтобы создать apphost.exe)
+      - name: Build all platforms separately
+        shell: pwsh
+        run: |
+          $platforms = @("x86", "x64", "ARM64")
+          
+          foreach ($platform in $platforms) {
+            Write-Host "========================================="
+            Write-Host "Pre-building for $platform"
+            Write-Host "========================================="
+            
+            # Очищаем папки для этой платформы
+            Remove-Item -Path "$env:Solution_Name_Unpacked\obj\$platform" -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item -Path "$env:Solution_Name_Unpacked\bin\$platform" -Recurse -Force -ErrorAction SilentlyContinue
+            
+            $projectPath = "$env:Solution_Name_Unpacked\$env:Solution_Name_Unpacked.csproj"
+            
+            # Восстанавливаем зависимости
+            dotnet restore $projectPath
+            
+            # Собираем с указанием платформы и RID
+            dotnet build $projectPath `
+              --configuration $env:Configuration `
+              --runtime win-$platform `
+              -p:Platform=$platform `
+              -p:UseAppHost=true `
+              -p:EnableNETAnalyzers=false `
+              -p:WarningLevel=0 `
+              -p:TreatWarningsAsErrors=false
+              
+            Write-Host "✓ Pre-build completed for $platform"
+          }
+
+      # ШАГ 2: Теперь создаем MSIX пакеты для всех платформ
+      - name: Create MSIX packages for all platforms
         run: |
           $platforms = "x64", "x86", "ARM64"
+          
           foreach ($platform in $platforms) {
+            Write-Host "========================================="
+            Write-Host "Creating MSIX package for $platform"
+            Write-Host "========================================="
+            
             $certificatePath = "${{ github.workspace }}\GitHubActionsWorkflow.pfx"
+            
             msbuild $env:Solution_Name `
               /p:Configuration=$env:Configuration `
               /p:Platform=$platform `
@@ -152,6 +171,7 @@ jobs:
               /p:EnableNETAnalyzers=false `
               /p:WarningLevel=0 `
               /p:TreatWarningsAsErrors=false `
+              /p:AppxPackagePlatforms="$platform" `
               /clp:ErrorsOnly
           }
         env:
@@ -161,20 +181,17 @@ jobs:
           Configuration: ${{ matrix.configuration }}
           TOKEN_STAT_DEFAULT_GATE: ${{ secrets.TOKEN_STAT_DEFAULT_GATE }}
 
-      # Удалить pfx
       - name: Remove the pfx
         run: |
           $certificatePath = "${{ github.workspace }}\GitHubActionsWorkflow.pfx"
           Remove-Item -path "$certificatePath"
           
-      # Переименовать .cer файл
       - name: Rename the .cer file
         run: |
           Get-ChildItem -Path "${{ env.Solution_Name }}\\Packages" -Filter *.cer -Recurse -Depth 1 | ForEach-Object {
             Rename-Item -Path $_.FullName -NewName "Certificate.cer"
           }
           
-      # Move .msix, .cer, and .msixbundle files
       - name: Move files to the Packages folder
         run: |
           $fileTypes = "*.msix", "*.cer", "*.msixbundle"
@@ -187,224 +204,130 @@ jobs:
             }
           }
           
-      - name: Display disk tree
+      - name: Display MSIX files
         run: |
-          Get-ChildItem -Recurse | Sort-Object Length -Descending
+          Get-ChildItem -Path "${{ env.Solution_Name }}\\Packages" | ForEach-Object {
+            Write-Host "Found: $($_.Name) - Size: $([math]::Round($_.Length/1MB, 2)) MB"
+          }
           
-      # Upload the MSIX package
       - name: Upload MSIX package
         uses: actions/upload-artifact@v4
         with:
-          name: MSIX Package
+          name: MSIX Packages
           path: |
             ${{ env.Solution_Name }}\\Packages\*.cer
             ${{ env.Solution_Name }}\\Packages\*.msixbundle
             ${{ env.Solution_Name }}\\Packages\*.msix
-      
-      - name: Получить релизы
-        id: get_releases
-        run: |
-          $headers = @{
-            "Authorization" = "token ${{ secrets.TOKEN }}"
-          }
-          $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/${{ github.repository }}/releases" -Headers $headers
-          echo "::set-output name=releases::$releases"
-        shell: pwsh
-        if: github.event.inputs.release == 'true'
 
-#-------------------------------------------------------EXE (ИСПРАВЛЕННАЯ ВЕРСИЯ)
+#-------------------------------------------------------EXE СБОРКА
 
-      - name: Clean EXE build artifacts
-        run: |
-          if (Test-Path "$env:Solution_Name_Unpacked\bin") { Remove-Item -Recurse -Force "$env:Solution_Name_Unpacked\bin" -ErrorAction SilentlyContinue }
-          if (Test-Path "$env:Solution_Name_Unpacked\obj") { Remove-Item -Recurse -Force "$env:Solution_Name_Unpacked\obj" -ErrorAction SilentlyContinue }
-          Write-Host "Cleaned build artifacts"
-
-      # PFX для подписи
       - name: Decode PFX for signing
         run: |
           $bytes = [Convert]::FromBase64String("${{ secrets.BASE64_ENCODED_PFX }}")
           $certPath = "${{ github.workspace }}\signcert.pfx"
           [IO.File]::WriteAllBytes($certPath, $bytes)
-          Write-Host "PFX decoded to: $certPath"
 
-      # Сборка EXE через dotnet (исправлено)
-      - name: Build EXE with dotnet
+      # Сборка EXE через dotnet publish
+      - name: Build EXE for all platforms
         shell: pwsh
         run: |
-          $arches = @(
-            @{ Platform = "x64";   RID = "win-x64"   },
-            @{ Platform = "x86";   RID = "win-x86"   },
-            @{ Platform = "ARM64"; RID = "win-arm64" }
+          $platforms = @(
+            @{ Name = "x64";   RID = "win-x64"   },
+            @{ Name = "x86";   RID = "win-x86"   },
+            @{ Name = "ARM64"; RID = "win-arm64" }
           )
           
-          foreach ($a in $arches) {
-            Write-Host "========================================="
-            Write-Host "Building for $($a.Platform) ($($a.RID))"
-            Write-Host "========================================="
+          foreach ($p in $platforms) {
+            Write-Host "Building EXE for $($p.Name)"
             
             $projectPath = "$env:Solution_Name_Unpacked\$env:Solution_Name_Unpacked.csproj"
             
-            # Восстановление зависимостей
-            dotnet restore $projectPath -r $($a.RID)
-            
-            # Сборка проекта
-            dotnet build $projectPath `
+            # Публикуем в отдельную папку
+            dotnet publish $projectPath `
               --configuration $env:Configuration_unpacked `
-              --runtime $($a.RID) `
-              --no-restore `
-              -p:Platform=$($a.Platform) `
+              --runtime $($p.RID) `
+              --self-contained false `
+              --output "publish-exe\$($p.Name)" `
               -p:UseAppHost=true `
+              -p:PublishSingleFile=false `
               -p:EnableNETAnalyzers=false `
               -p:WarningLevel=0 `
               -p:TreatWarningsAsErrors=false
-            
-            # Проверка создания exe
-            $possiblePaths = @(
-              "$env:Solution_Name_Unpacked\bin\$($a.RID)\$env:Configuration_unpacked\$env:Solution_Name_Unpacked.exe",
-              "$env:Solution_Name_Unpacked\bin\$($a.Platform)\$env:Configuration_unpacked\$env:Solution_Name_Unpacked.exe"
-            )
-            
-            $found = $false
-            foreach ($path in $possiblePaths) {
-              if (Test-Path $path) {
-                Write-Host "✓ EXE created: $path"
-                $found = $true
-                break
-              }
-            }
-            
-            if (-not $found) {
-              Write-Host "✗ EXE not found for $($a.Platform)"
-              Get-ChildItem -Recurse "$env:Solution_Name_Unpacked\bin" -Filter *.exe | ForEach-Object {
-                Write-Host "Found exe: $($_.FullName)"
-              }
-            }
           }
 
-      # Подпись exe файлов
       - name: Sign exe files
         shell: pwsh
         run: |
           $certPath = "${{ github.workspace }}\signcert.pfx"
           $password = "${{ secrets.PFX_PASSWORD }}"
           
-          if (-not (Test-Path $certPath)) {
-            Write-Host "Certificate not found at $certPath, skipping signing"
-            exit 0
-          }
-          
-          # Ищем signtool
           $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter signtool.exe |
-                      Where-Object { $_.FullName -match 'x64' -and $_.FullName -notmatch '10.0.17134.0' } |
-                      Sort-Object FullName -Descending |
+                      Where-Object { $_.FullName -match 'x64' } |
                       Select-Object -First 1 -ExpandProperty FullName
           
-          if (-not $signtool) {
-            Write-Host "signtool.exe not found, skipping signing"
-            exit 0
-          }
-          
-          Write-Host "Using signtool: $signtool"
-          
-          # Находим все exe файлы в папках сборки
-          $exeFiles = Get-ChildItem -Path "$env:Solution_Name_Unpacked\bin" -Recurse -Filter *.exe
-          
-          foreach ($exe in $exeFiles) {
-            Write-Host "Signing: $($exe.FullName)"
-            & $signtool sign /f $certPath /p $password /tr http://timestamp.digicert.com /td sha256 /fd sha256 $exe.FullName
+          if ($signtool -and (Test-Path $certPath)) {
+            $exeFiles = Get-ChildItem -Path "publish-exe" -Recurse -Filter *.exe
+            foreach ($exe in $exeFiles) {
+              Write-Host "Signing: $($exe.FullName)"
+              & $signtool sign /f $certPath /p $password /tr http://timestamp.digicert.com /td sha256 /fd sha256 $exe.FullName
+            }
           }
 
-      # Архивирование собранных файлов
-      - name: Package build folders
+      - name: Package EXE folders
         shell: pwsh
         run: |
           $platforms = @("x64", "x86", "ARM64")
-          
           foreach ($platform in $platforms) {
-            # Пытаемся найти папку сборки
-            $possiblePaths = @(
-              "$env:Solution_Name_Unpacked\bin\win-$platform\$env:Configuration_unpacked",
-              "$env:Solution_Name_Unpacked\bin\$platform\$env:Configuration_unpacked"
-            )
-            
-            $buildDir = $null
-            foreach ($path in $possiblePaths) {
-              if (Test-Path $path) {
-                $buildDir = $path
-                break
-              }
-            }
-            
-            if ($buildDir) {
+            $buildDir = "publish-exe\$platform"
+            if (Test-Path $buildDir) {
               $zipName = "VK_UI3_$platform.zip"
-              if (Test-Path $zipName) { Remove-Item $zipName -Force }
-              Write-Host "Creating archive from: $buildDir"
               Compress-Archive -Path "$buildDir\*" -DestinationPath $zipName -Force
-              Write-Host "Created: $zipName"
-            } else {
-              Write-Host "Build folder not found for $platform"
+              Write-Host "Created: $zipName ($([math]::Round((Get-Item $zipName).Length/1MB, 2)) MB)"
             }
           }
 
-      - name: List created zip files
-        run: |
-          Get-ChildItem -Filter "VK_UI3_*.zip" | ForEach-Object { 
-            Write-Host "Found: $($_.Name) - Size: $([math]::Round($_.Length/1MB, 2)) MB" 
-          }
-
-      - name: Upload zips to artifacts
+      - name: Upload EXE zips to artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: VK_UI3_Zips_${{ github.run_id }}
+          name: EXE_Zips_${{ github.run_id }}
           path: VK_UI3_*.zip
           retention-days: 30
-          if-no-files-found: warn
 
 #------------------------------------------
-
       - name: Проверить существование релиза
         id: check_release
         run: |
           $version = "${{ steps.get_version.outputs.VERSION }}"
           $headers = @{
             "Authorization" = "token ${{ secrets.TOKEN }}"
-            "Accept" = "application/vnd.github.v3+json"
           }
           try {
             $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/${{ github.repository }}/releases" -Headers $headers
-            $release = $releases | Where-Object { $_.tag_name -eq $version -and $_.draft -eq $false -and $_.prerelease -eq $false }
+            $release = $releases | Where-Object { $_.tag_name -eq $version }
             if ($release) {
-              Write-Host "Релиз с тегом $version уже существует"
               echo "exists=true" >> $env:GITHUB_OUTPUT
             } else {
-              Write-Host "Релиз с тегом $version не найден"
               echo "exists=false" >> $env:GITHUB_OUTPUT
             }
           } catch {
-            Write-Host "Ошибка при проверке релизов: $($_.Exception.Message)"
             echo "exists=false" >> $env:GITHUB_OUTPUT
           }
         shell: pwsh
         if: github.event.inputs.release == 'true'
       
       - name: Создать релиз
-        id: create_release
         uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
         with:
           tag_name: ${{ steps.get_version.outputs.VERSION }}
           name: ${{ github.event.inputs.namevers }}
-          body: |
-            ${{ github.event.inputs.descr }}
+          body: ${{ github.event.inputs.descr }}
           draft: false
           prerelease: ${{ github.event.inputs.prerelease == 'true' }}
-          generate_release_notes: false
         if: steps.check_release.outputs.exists == 'false' && github.event.inputs.release == 'true'
         
-      # Загрузка zip файлов
-      - name: Upload zips to release
+      - name: Upload EXE zips to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.TOKEN }}
@@ -414,8 +337,7 @@ jobs:
           file_glob: true
         if: steps.check_release.outputs.exists == 'false' && github.event.inputs.release == 'true'
       
-      # Загрузка пакетов
-      - name: Upload packages to release
+      - name: Upload MSIX packages to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.TOKEN }}
@@ -429,23 +351,20 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/${{ steps.get_version.outputs.VERSION }}
         run: |
-          $telegramBotToken = '${{ secrets.TELEGRAM_BOT_TOKEN }}'
-          $telegramChatId = '${{ secrets.TELEGRAM_CHAT_ID }}'
-          $releaseUrl = 'https://github.com/${{ github.repository }}/releases/tag/${{ steps.get_version.outputs.VERSION }}'
+          $version = "${{ steps.get_version.outputs.VERSION }}"
+          $releaseUrl = "https://github.com/${{ github.repository }}/releases/tag/$version"
           $message = @"
           <b>🎉 Новый релиз:</b> ${{ github.event.inputs.namevers }}
-          <b>📦 Версия:</b> ${{ steps.get_version.outputs.VERSION }}
+          <b>📦 Версия:</b> $version
           <b>📝 Описание:</b> ${{ github.event.inputs.descr }}
           <b>🔗 <a href='$releaseUrl'>Ссылка на релиз</a></b>
           "@
-          $uri = 'https://api.telegram.org/bot' + $telegramBotToken + '/sendMessage'
+          $uri = "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage"
           $body = @{
-              chat_id = $telegramChatId
+              chat_id = ${{ secrets.TELEGRAM_CHAT_ID }}
               text = $message
               parse_mode = 'HTML'
           }
-          $bodyJson = $body | ConvertTo-Json -Compress
-          Invoke-RestMethod -Uri $uri -Method Post -Body $bodyJson -ContentType 'application/json'
+          Invoke-RestMethod -Uri $uri -Method Post -Body ($body | ConvertTo-Json) -ContentType 'application/json'
         if: steps.check_release.outputs.exists == 'false' && github.event.inputs.release == 'true'
