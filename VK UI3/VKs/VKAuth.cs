@@ -212,7 +212,15 @@ namespace VK_UI3.VKs
                     return;
                 }
 
-                await NextStepAsync(nextStep.VerificationMethod, VerificationMethods.Where(ver => ver.Name.Equals(nextStep.VerificationMethod)).FirstOrDefault().Info);
+                var verificationMethod = VerificationMethods.FirstOrDefault(ver => ver.Name.Equals(nextStep.VerificationMethod));
+                if (verificationMethod != null)
+                {
+                    await NextStepAsync(nextStep.VerificationMethod, verificationMethod.Info);
+                }
+                else
+                {
+                    await ShowAnotherVerificationMethodsAsync(); // показать другие способы
+                }
             }
             catch (Exception ex)
             {
