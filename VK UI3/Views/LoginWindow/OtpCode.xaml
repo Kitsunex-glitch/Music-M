@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <Page
     x:Class="VK_UI3.Views.LoginWindow.OtpCode"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -28,53 +28,52 @@
                 MaxWidth="300"
                 Margin="0,16,0,0"
                 HorizontalAlignment="Center"
+                AutomationProperties.Name="Введите код двухфакторной авторизации"
                 Style="{StaticResource SubtitleTextBlockStyle}"
                 Text="Введите код двухфакторной авторизации"
-                TextAlignment="Center"
-                AutomationProperties.Name="Введите код двухфакторной авторизации" />
+                TextAlignment="Center" />
 
 
             <TextBox
                 Name="CodeBox"
                 Margin="0,10,0,0"
+                AutomationProperties.Name="Поле ввода кода двухфакторной авторизации"
                 KeyDown="passpey_KeyDown"
-                MaxLength="{x:Bind CodeLength, Mode=OneWay}"
                 PlaceholderText="2Auth код"
-                TextAlignment="Center"
-                AutomationProperties.Name="Поле ввода кода двухфакторной авторизации" />
+                TextAlignment="Center" />
             <TextBlock
                 x:Name="passpey"
                 MaxWidth="250"
                 Margin="0,16,0,0"
                 HorizontalAlignment="Center"
+                AutomationProperties.Name="Информация о способе получения кода"
                 FontSize="12"
                 Opacity="0.70"
                 Style="{StaticResource SubtitleTextBlockStyle}"
                 Text=""
-                TextAlignment="Center"
-                AutomationProperties.Name="Информация о способе получения кода" />
+                TextAlignment="Center" />
             <Button
-                 Style="{StaticResource AccentButtonStyle}"
                 Margin="0,20,0,0"
                 HorizontalAlignment="Stretch"
+                AutomationProperties.Name="Кнопка продолжения"
                 Click="SubmitButton_Click"
                 Content="Продолжить"
-                AutomationProperties.Name="Кнопка продолжения" />
+                Style="{StaticResource AccentButtonStyle}" />
             <Button
                 x:Name="goAnotherBTN"
                 Margin="0,10,0,0"
                 HorizontalAlignment="Stretch"
+                AutomationProperties.Name="Другие варианты входа"
                 Click="ShowAnotherVerificationMethodsButton_Click"
-                Content="Другие варианты входа"
-                AutomationProperties.Name="Другие варианты входа" />
+                Content="Другие варианты входа" />
 
             <Button
                 x:Name="BackBTN"
                 Margin="0,40,0,0"
                 HorizontalAlignment="Stretch"
+                AutomationProperties.Name="Кнопка отмены"
                 Click="BackButton"
-                Content="Отмена"
-                AutomationProperties.Name="Кнопка отмены" />
+                Content="Отмена" />
         </StackPanel>
     </Grid>
 
