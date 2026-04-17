@@ -409,7 +409,7 @@ namespace VK_UI3.VKs
                     requestedLoginWay = LoginWay.Email;
                 //  else _logger.Error("Unknown login way {LoginWay}", requestedLoginWay);
 
-                Vk2FaResponse = new(requestedLoginWay, LoginWay.None, null, 0, 6, false, llogin);
+                Vk2FaResponse = new(requestedLoginWay, LoginWay.None, null, 0, 8, false, llogin);
             }
 
             _codeTask = new();
