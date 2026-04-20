@@ -21,11 +21,11 @@ namespace VK_UI3.Services
             { "reconnect_on_network_error", "1" },
             { "reconnect_on_http_error", "4xx,5xx" },
             { "tcp_nodelay", "1" },
-            { "buffer_size", "65536" },     
-            { "max_buffer_size", "131072" },  
-            { "probesize", "131072" },        
-            { "analyzeduration", "100000" },    
-            { "fflags", "nobuffer+fastseek+discardcorrupt" }, 
+            { "buffer_size", "524288" },     
+            { "max_buffer_size", "1048576" }, 
+            { "probesize", "1048576" },      
+            { "analyzeduration", "500000" },  
+            { "fflags", "fastseek+flush_packets" },
             { "user_agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" }
         };
 
