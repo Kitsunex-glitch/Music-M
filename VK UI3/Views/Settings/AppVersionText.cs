@@ -29,7 +29,11 @@ namespace VK_UI3.Views.Settings
 
         private void AppVersionText_Loaded(object sender, RoutedEventArgs e)
         {
-            this.Content = GetTextBlock();
+            try
+            {
+                this.Content = GetTextBlock();
+            }catch
+            { }
         }
 
         public TextBlock GetTextBlock()

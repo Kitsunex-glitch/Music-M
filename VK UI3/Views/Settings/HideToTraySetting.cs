@@ -11,21 +11,25 @@ namespace VK_UI3.Views.Settings
     {
         public HideToTraySetting()
         {
-            this.Content = "Скрывать в трей при закрытии";
+            try
+            {
+                this.Content = "Скрывать в трей при закрытии";
 
-            this.Checked += StartUpSetting_Checked;
-            this.Unchecked += StartUpSetting_Unchecked;
-            this.Loaded += StartUpSetting_Loaded;
+                this.Checked += StartUpSetting_Checked;
+                this.Unchecked += StartUpSetting_Unchecked;
+                this.Loaded += StartUpSetting_Loaded;
 
-            // Получение стиля из ресурсов
-            Style style = Application.Current.Resources["DefaultCheckBoxStyle"] as Style;
-            
-            // Установка стиля
-            this.Style = style;
-            
-            // Добавляем свойства доступности для экранного диктера
-            AutomationProperties.SetName(this, "Скрывать в трей при закрытии");
-            AutomationProperties.SetHelpText(this, "Скрывает приложение в системный трей вместо полного закрытия при нажатии на кнопку закрытия");
+                // Получение стиля из ресурсов
+                Style style = Application.Current.Resources["DefaultCheckBoxStyle"] as Style;
+
+                // Установка стиля
+                this.Style = style;
+
+                // Добавляем свойства доступности для экранного диктера
+                AutomationProperties.SetName(this, "Скрывать в трей при закрытии");
+                AutomationProperties.SetHelpText(this, "Скрывает приложение в системный трей вместо полного закрытия при нажатии на кнопку закрытия");
+            }
+            catch { }
         }
 
         private void StartUpSetting_Loaded(object sender, RoutedEventArgs e)

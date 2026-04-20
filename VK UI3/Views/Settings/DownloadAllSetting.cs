@@ -1,4 +1,4 @@
-using Microsoft.UI.Xaml;
+﻿using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using VK_UI3.DB;
 using VK_UI3.DownloadTrack;
@@ -14,22 +14,26 @@ namespace VK_UI3.Views.Settings
         public StartAllTaskSetting()
         {
 
+            try
+            {
+                this.Content = "Запускать все таски автоматически";
 
-            this.Content = "Запускать все таски автоматически";
+                this.Checked += StartUpSetting_Checked;
+                this.Unchecked += StartUpSetting_Unchecked;
+                this.Loaded += StartUpSetting_Loaded;
 
-            this.Checked += StartUpSetting_Checked;
-            this.Unchecked += StartUpSetting_Unchecked;
-            this.Loaded += StartUpSetting_Loaded;
+                // Получение стиля из ресурсов
+                Style style = Application.Current.Resources["DefaultCheckBoxStyle"] as Style;
 
-            // Получение стиля из ресурсов
-            Style style = Application.Current.Resources["DefaultCheckBoxStyle"] as Style;
+                // Установка стиля
+                this.Style = style;
 
-            // Установка стиля
-            this.Style = style;
-            
-            // Добавляем свойства доступности для экранного диктера
-            AutomationProperties.SetName(this, "Запускать все задачи автоматически");
-            AutomationProperties.SetHelpText(this, "Автоматически запускает все задачи скачивания при запуске приложения");
+                // Добавляем свойства доступности для экранного диктера
+                AutomationProperties.SetName(this, "Запускать все задачи автоматически");
+                AutomationProperties.SetHelpText(this, "Автоматически запускает все задачи скачивания при запуске приложения");
+            }
+            catch { 
+            }
         }
 
         private void StartUpSetting_Loaded(object sender, RoutedEventArgs e)

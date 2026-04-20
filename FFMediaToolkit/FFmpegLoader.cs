@@ -188,6 +188,12 @@
                 AVFormatContext* pOutputFormatContext = null;
                 AVDictionary* options = null;
                 ffmpeg.av_dict_set(&options, "http_persistent", "0", 0);
+                ffmpeg.av_dict_set(&options, "reconnect_streamed", "1", 0);
+                ffmpeg.av_dict_set(&options, "reconnect_at_eof", "1", 0);
+                ffmpeg.av_dict_set(&options, "reconnect_delay_max", "5", 0);
+                ffmpeg.av_dict_set(&options, "rw_timeout", "20000000", 0);
+                ffmpeg.av_dict_set(&options, "buffer_size", "16777216", 0);
+                ffmpeg.av_dict_set(&options, "user_agent", "Mozilla/5.0 ...", 0);
 
                 try
                 {

@@ -13,6 +13,7 @@ using Windows.Media.Core;
 using Windows.Media.MediaProperties;
 using Windows.Media.Playback;
 using WinRT;
+using VK_UI3.Services;
 
 namespace MusicX.Services.Player.Sources;
 
@@ -122,6 +123,49 @@ public abstract class MediaSourceBase : ITrackMediaSource
 {
     private static readonly Semaphore FFmpegSemaphore = new(1, 1, "MusicX_FFmpegSemaphore");
 
+    protected static MediaOptions GetMediaOptions()
+    {
+        var settings = FfmpegSettingsManager.GetSettingsDictionary();
+        
+        var mediaOptions = new MediaOptions
+        {
+            StreamsToLoad = MediaMode.Audio,
+            AudioSampleFormat = SampleFormat.SignedWord,
+            DemuxerOptions =
+            {
+                FlagDiscardCorrupt = false,
+                FlagEnableFastSeek = true,
+                SeekToAny = true,
+                PrivateOptions = new System.Collections.Generic.Dictionary<string, string>()
+            }
+        };
+
+        // Применяем настройки из базы данных
+        foreach (var setting in settings)
+        {
+            mediaOptions.DemuxerOptions.PrivateOptions[setting.Key] = setting.Value;
+        }
+
+        // Убеждаемся, что все стандартные настройки присутствуют
+        EnsureDefaultSettings(mediaOptions.DemuxerOptions.PrivateOptions);
+
+        return mediaOptions;
+    }
+
+    private static void EnsureDefaultSettings(System.Collections.Generic.Dictionary<string, string> privateOptions)
+    {
+        // Добавляем стандартные значения, если они отсутствуют
+        var defaultSettings = FfmpegSettingsManager.DefaultSettings;
+        foreach (var defaultSetting in defaultSettings)
+        {
+            if (!privateOptions.ContainsKey(defaultSetting.Key))
+            {
+                privateOptions[defaultSetting.Key] = defaultSetting.Value;
+            }
+        }
+    }
+
+    [Obsolete("Используйте GetMediaOptions() для получения настроек с учетом пользовательских конфигураций")]
     protected static readonly MediaOptions MediaOptions = new()
     {
         StreamsToLoad = MediaMode.Audio,
@@ -133,23 +177,22 @@ public abstract class MediaSourceBase : ITrackMediaSource
             SeekToAny = true,
             PrivateOptions =
             {
-                ["http_persistent"] = "false",
+                ["http_persistent"] = "1",
                 ["reconnect"] = "1",
+                ["reconnect_at_eof"] = "1",
                 ["reconnect_streamed"] = "1",
+                ["reconnect_delay_max"] = "10",
                 ["reconnect_on_network_error"] = "1",
-                ["reconnect_delay_max"] = "5",
                 ["reconnect_on_http_error"] = "4xx,5xx",
-                ["stimeout"] = "10000000",
-                ["timeout"] = "10000000",
-                ["rw_timeout"] = "10000000",
-                ["avioflags"] = "direct",
-                ["multiple_requests"] = "1",
-                ["buffer_size"] = "1024000",
-                ["max_delay"] = "500000",
-                ["fflags"] = "+nobuffer+fastseek",
-                ["http_proxy"] = "",
-                ["user_agent"] = "MusicX Player"
+                ["tcp_nodelay"] = "1",
+                ["buffer_size"] = "1048576",
+                ["max_buffer_size"] = "4194304",
+                ["probesize"] = "524288",
+                ["analyzeduration"] = "500000",
+                ["fflags"] = "nobuffer+fastseek+flush_packets",
+                ["user_agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" // Более "человечный" UA
             }
+
         }
     };
 
@@ -157,8 +200,11 @@ public abstract class MediaSourceBase : ITrackMediaSource
 
     protected static MediaPlaybackItem CreateMediaPlaybackItem(MediaFile file)
     {
+        System.Diagnostics.Debug.WriteLine("[FFMedia] CreateMediaPlaybackItem started");
         var streamingSource = CreateFFMediaStreamSource(file);
-        return new MediaPlaybackItem(MediaSource.CreateFromMediaStreamSource(streamingSource));
+        var mediaPlaybackItem = new MediaPlaybackItem(MediaSource.CreateFromMediaStreamSource(streamingSource));
+        System.Diagnostics.Debug.WriteLine("[FFMedia] CreateMediaPlaybackItem completed");
+        return mediaPlaybackItem;
     }
 
     public static MediaStreamSource CreateFFMediaStreamSource(string url)
@@ -188,7 +234,7 @@ public abstract class MediaSourceBase : ITrackMediaSource
         var position = TimeSpan.Zero;
         var isBuffering = false;
         var lastSampleTime = DateTime.Now;
-        var bufferThreshold = TimeSpan.FromSeconds(1.5);
+        var bufferThreshold = TimeSpan.FromSeconds(0.5);
         var consecutiveErrors = 0;
         var maxConsecutiveErrors = 3;
 
@@ -234,6 +280,11 @@ public abstract class MediaSourceBase : ITrackMediaSource
                 if (!file.IsDisposed)
                 {
                     file.Dispose();
+                    Debug.WriteLine("[FFMedia] File disposed successfully");
+                }
+                else
+                {
+                    Debug.WriteLine("[FFMedia] File was already disposed");
                 }
             }
             catch (Exception ex)
@@ -492,15 +543,16 @@ public abstract class MediaSourceBase : ITrackMediaSource
 
     public static Task<FFmpegInteropX.FFmpegMediaSource> CreateWinRtMediaSource(Audio data, IReadOnlyDictionary<string, string>? customOptions = null, CancellationToken cancellationToken = default)
     {
+        var mediaOptions = GetMediaOptions();
         var options = new PropertySet();
 
-        foreach (var option in MediaOptions.DemuxerOptions.PrivateOptions)
+        foreach (var option in mediaOptions.DemuxerOptions.PrivateOptions)
         {
             if (option.Key != null && option.Value != null)
                 options.Add(option.Key, option.Value);
         }
 
-        if (!MediaOptions.DemuxerOptions.FlagDiscardCorrupt)
+        if (!mediaOptions.DemuxerOptions.FlagDiscardCorrupt)
             options.Add("err_detect", "ignore_err");
 
 
@@ -509,11 +561,6 @@ public abstract class MediaSourceBase : ITrackMediaSource
                 if (key != null && value != null)
                     options[key] = value;
 
-        // Добавляем дополнительные опции для лучшего восстановления
-        options["reconnect"] = "1";
-        options["reconnect_delay_max"] = "5";
-        options["reconnect_streamed"] = "1";
-        options["stimeout"] = "10000000";
 
         return FFmpegInteropX.FFmpegMediaSource.CreateFromUriAsync(data.Url.ToString(), new()
         {
@@ -530,18 +577,26 @@ public abstract class MediaSourceBase : ITrackMediaSource
 
     protected static void RegisterSourceObjectReference(MediaPlayer player, IWinRTObject rtObject)
     {
+        Debug.WriteLine("[FFMedia] Registering source object reference");
         GC.SuppressFinalize(rtObject.NativeObject);
 
         player.SourceChanged += PlayerOnSourceChanged;
 
         void PlayerOnSourceChanged(MediaPlayer sender, object args)
         {
+            Debug.WriteLine("[FFMedia] Player source changed, disposing rtObject");
             player.SourceChanged -= PlayerOnSourceChanged;
 
             if (rtObject is IDisposable disposable)
+            {
                 disposable.Dispose();
+                Debug.WriteLine("[FFMedia] rtObject disposed successfully");
+            }
             else
+            {
                 GC.ReRegisterForFinalize(rtObject);
+                Debug.WriteLine("[FFMedia] rtObject re-registered for finalization");
+            }
         }
     }
 }

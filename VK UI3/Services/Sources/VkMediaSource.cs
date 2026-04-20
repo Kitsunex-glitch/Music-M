@@ -102,16 +102,17 @@ public class VkMediaSource : MediaSourceBase
             _logger.Error(e, "Failed to use winrt decoder for vk media source");
 
 
+            var baseMediaOptions = GetMediaOptions();
             var mediaOptions = new MediaOptions
             {
-                StreamsToLoad = MediaOptions.StreamsToLoad,
-                AudioSampleFormat = MediaOptions.AudioSampleFormat,
+                StreamsToLoad = baseMediaOptions.StreamsToLoad,
+                AudioSampleFormat = baseMediaOptions.AudioSampleFormat,
             };
 
-            mediaOptions.DemuxerOptions.FlagDiscardCorrupt = MediaOptions.DemuxerOptions.FlagDiscardCorrupt;
-            mediaOptions.DemuxerOptions.FlagEnableFastSeek = MediaOptions.DemuxerOptions.FlagEnableFastSeek;
-            mediaOptions.DemuxerOptions.SeekToAny = MediaOptions.DemuxerOptions.SeekToAny;
-            mediaOptions.DemuxerOptions.PrivateOptions = new Dictionary<string, string>(MediaOptions.DemuxerOptions.PrivateOptions);
+            mediaOptions.DemuxerOptions.FlagDiscardCorrupt = baseMediaOptions.DemuxerOptions.FlagDiscardCorrupt;
+            mediaOptions.DemuxerOptions.FlagEnableFastSeek = baseMediaOptions.DemuxerOptions.FlagEnableFastSeek;
+            mediaOptions.DemuxerOptions.SeekToAny = baseMediaOptions.DemuxerOptions.SeekToAny;
+            mediaOptions.DemuxerOptions.PrivateOptions = new Dictionary<string, string>(baseMediaOptions.DemuxerOptions.PrivateOptions);
 
 
             // Добавляем эквалайзер, если он передан
@@ -128,7 +129,7 @@ public class VkMediaSource : MediaSourceBase
             // i think its better to use task.run over task.yield because we aren't doing async with ffmpeg
             var playbackItem = await Task.Run(() =>
             {
-                var file = MediaFile.Open(track.Url.ToString(), mediaOptions);
+                using var file = MediaFile.Open(track.Url.ToString(), mediaOptions);
 
                 return CreateMediaPlaybackItem(file);
             }, cancellationToken);

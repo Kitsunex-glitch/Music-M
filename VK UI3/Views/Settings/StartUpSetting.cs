@@ -11,21 +11,25 @@ namespace VK_UI3.Views.Settings
     {
         public StartUpSetting()
         {
-            this.Content = "Добавить приложение в автозагрузку";
+            try
+            {
+                this.Content = "Добавить приложение в автозагрузку";
 
-            this.Checked += StartUpSetting_Checked;
-            this.Unchecked += StartUpSetting_Unchecked;
-            this.Loaded += StartUpSetting_Loaded;
+                this.Checked += StartUpSetting_Checked;
+                this.Unchecked += StartUpSetting_Unchecked;
+                this.Loaded += StartUpSetting_Loaded;
 
-            // Получение стиля из ресурсов
-            Style style = Application.Current.Resources["DefaultCheckBoxStyle"] as Style;
-            
-            // Установка стиля
-            this.Style = style;
-            
-            // Добавляем свойства доступности для экранного диктера
-            AutomationProperties.SetName(this, "Добавить приложение в автозагрузку");
-            AutomationProperties.SetHelpText(this, "Включает или выключает автоматический запуск приложения при старте системы");
+                // Получение стиля из ресурсов
+                Style style = Application.Current.Resources["DefaultCheckBoxStyle"] as Style;
+
+                // Установка стиля
+                this.Style = style;
+
+                // Добавляем свойства доступности для экранного диктера
+                AutomationProperties.SetName(this, "Добавить приложение в автозагрузку");
+                AutomationProperties.SetHelpText(this, "Включает или выключает автоматический запуск приложения при старте системы");
+            }
+            catch { }
         }
 
         private void StartUpSetting_Loaded(object sender, RoutedEventArgs e)

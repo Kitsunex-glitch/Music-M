@@ -11,17 +11,23 @@ namespace VK_UI3.Views.Settings
     {
         public CreateDesktopShortcut()
         {
-            this.CornerRadius = new CornerRadius(8);
-            Click += CreateDesktopShortcut_Click;
-            Style style = Application.Current.Resources["DefaultButtonStyle"] as Style;
-            this.Style = style;
-            this.Content = "Создать ярлык на рабочем столе";
-            
-            // Добавляем свойства доступности для экранного диктера
-            AutomationProperties.SetName(this, "Создать ярлык на рабочем столе");
-            AutomationProperties.SetHelpText(this, "Создает ярлык приложения на рабочем столе");
+            try
+            {
+                this.CornerRadius = new CornerRadius(8);
+                Click += CreateDesktopShortcut_Click;
+                Style style = Application.Current.Resources["DefaultButtonStyle"] as Style;
+                this.Style = style;
+                this.Content = "Создать ярлык на рабочем столе";
 
-            LoadShortcutState();
+                // Добавляем свойства доступности для экранного диктера
+                AutomationProperties.SetName(this, "Создать ярлык на рабочем столе");
+                AutomationProperties.SetHelpText(this, "Создает ярлык приложения на рабочем столе");
+
+                LoadShortcutState();
+            }
+            catch
+            { 
+            }
         }
 
         private async void LoadShortcutState()

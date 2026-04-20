@@ -11,22 +11,26 @@ namespace VK_UI3.Views.Settings
     {
         public DisableDiscordIntegration()
         {
-            this.Content = "Отключить интеграцию с Discord";
+            try
+            {
+                this.Content = "Отключить интеграцию с Discord";
 
-            this.Checked += StartUpSetting_Checked;
-            this.Unchecked += StartUpSetting_Unchecked;
-            this.Loaded += StartUpSetting_Loaded;
+                this.Checked += StartUpSetting_Checked;
+                this.Unchecked += StartUpSetting_Unchecked;
+                this.Loaded += StartUpSetting_Loaded;
 
-            // Получение стиля из ресурсов
-            Style style = Application.Current.Resources["DefaultCheckBoxStyle"] as Style;
-            
-            // Установка стиля
-            this.Style = style;
-            
-            // Добавляем свойства доступности для экранного диктера
-            AutomationProperties.SetName(this, "Отключить интеграцию с Discord");
-            AutomationProperties.SetHelpText(this, "Отключает отображение информации о воспроизводимой музыке в статусе Discord");
-        }
+                // Получение стиля из ресурсов
+                Style style = Application.Current.Resources["DefaultCheckBoxStyle"] as Style;
+
+                // Установка стиля
+                this.Style = style;
+
+                // Добавляем свойства доступности для экранного диктера
+                AutomationProperties.SetName(this, "Отключить интеграцию с Discord");
+                AutomationProperties.SetHelpText(this, "Отключает отображение информации о воспроизводимой музыке в статусе Discord");
+            }
+            catch { }
+            }
 
         private void StartUpSetting_Loaded(object sender, RoutedEventArgs e)
         {

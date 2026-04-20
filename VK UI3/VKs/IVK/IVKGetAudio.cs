@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using VK_UI3.Controllers;
 using VK_UI3.Helpers;
+using VK_UI3.Services;
 using VkNet.Abstractions;
 
 namespace VK_UI3.VKs.IVK
@@ -402,9 +403,10 @@ namespace VK_UI3.VKs.IVK
         public void PlayThis()
         {
             this.currentTrack = 0;
-            AudioPlayer.PlayList(this);
+            VK_UI3.Services.MediaPlayerService.PlayList(this);
+
         }
-        
+
         /// <summary>
         /// Воспроизводит трек
         /// </summary>
@@ -419,7 +421,7 @@ namespace VK_UI3.VKs.IVK
             {
                 currentTrack = numberInList;
             }
-            AudioPlayer.PlayList(this);
+            VK_UI3.Services.MediaPlayerService.PlayList(this);
         }
         
         /// <summary>

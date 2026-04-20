@@ -14,14 +14,18 @@ public class StartupManager
 
     public static async Task<bool> IsAppInStartupAsync()
     {
-        if (Packaged.IsPackaged())
+        try
         {
-            return await IsAppInStartupPackagedAsync();
+            if (Packaged.IsPackaged())
+            {
+                return await IsAppInStartupPackagedAsync();
+            }
+            else
+            {
+                return await IsAppInStartupUnpackagedAsync();
+            }
         }
-        else
-        {
-            return await IsAppInStartupUnpackagedAsync();
-        }
+        catch { }
     }
 
     public static async Task<bool> EnableStartupAsync()
