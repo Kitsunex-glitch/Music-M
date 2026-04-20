@@ -17,15 +17,15 @@ namespace VK_UI3.Services
             { "reconnect", "1" },
             { "reconnect_at_eof", "1" },
             { "reconnect_streamed", "1" },
-            { "reconnect_delay_max", "2" }, // Меньше ждать при обрыве
+            { "reconnect_delay_max", "2" },
             { "reconnect_on_network_error", "1" },
             { "reconnect_on_http_error", "4xx,5xx" },
             { "tcp_nodelay", "1" },
-            { "buffer_size", "65536" },      // 64 KB вместо 1 MB
-            { "max_buffer_size", "131072" },  // 128 KB вместо 4 MB
-            { "probesize", "32768" },         // Минимальный объем для определения формата
-            { "analyzeduration", "1000" },    // Минимум времени на анализ (1мс)
-            { "fflags", "nobuffer+fastseek+discardcorrupt" }, // Убрали flush_packets для скорости
+            { "buffer_size", "65536" },     
+            { "max_buffer_size", "131072" },  
+            { "probesize", "131072" },        
+            { "analyzeduration", "100000" },    
+            { "fflags", "nobuffer+fastseek+discardcorrupt" }, 
             { "user_agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" }
         };
 
