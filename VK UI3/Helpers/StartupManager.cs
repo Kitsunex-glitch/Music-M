@@ -25,7 +25,7 @@ public class StartupManager
                 return await IsAppInStartupUnpackagedAsync();
             }
         }
-        catch { }
+        catch { return false; }
     }
 
     public static async Task<bool> EnableStartupAsync()
