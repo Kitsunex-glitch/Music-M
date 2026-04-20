@@ -177,21 +177,24 @@ public abstract class MediaSourceBase : ITrackMediaSource
             SeekToAny = true,
             PrivateOptions =
             {
-                ["http_persistent"] = "1",
+                ["http_persistent"] = "false",
                 ["reconnect"] = "1",
-                ["reconnect_at_eof"] = "1",
                 ["reconnect_streamed"] = "1",
-                ["reconnect_delay_max"] = "10",
                 ["reconnect_on_network_error"] = "1",
+                ["reconnect_delay_max"] = "5",
                 ["reconnect_on_http_error"] = "4xx,5xx",
-                ["tcp_nodelay"] = "1",
-                ["buffer_size"] = "1048576",
-                ["max_buffer_size"] = "4194304",
-                ["probesize"] = "524288",
-                ["analyzeduration"] = "500000",
-                ["fflags"] = "nobuffer+fastseek+flush_packets",
-                ["user_agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" // Более "человечный" UA
+                ["stimeout"] = "10000000",
+                ["timeout"] = "10000000",
+                ["rw_timeout"] = "10000000",
+                ["avioflags"] = "direct",
+                ["multiple_requests"] = "1",
+                ["buffer_size"] = "1024000",
+                ["max_delay"] = "500000",
+                ["fflags"] = "+nobuffer+fastseek",
+                ["http_proxy"] = "",
+                ["user_agent"] = "MusicM Player"
             }
+
 
         }
     };
