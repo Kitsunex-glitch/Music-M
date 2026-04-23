@@ -45,7 +45,7 @@ public class AudioEqualizer
 
         public override string ToString()
         {
-            return $"f={Frequency}:t={WidthType}:width={Width}:g={Gain}";
+            return $"f={Frequency}:width_type={WidthType}:width={Width}:g={Gain}";
         }
     }
 

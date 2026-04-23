@@ -443,53 +443,102 @@ namespace VK_UI3
                 var not = new Helpers.NotificationsGetter();
                 var notifs = await not.GetNotificationsAsync();
 
-
                 foreach (var item in notifs)
                 {
                     try
                     {
-                        ButtonNotification button1 = null;
-                        ButtonNotification button2 = null;
-
-                        // Создаем первую кнопку, если есть ссылки
-                        if (item.Links != null && item.Links.Count > 0)
+                        // Преобразуем кнопки из нового формата
+                        var buttons = new List<ButtonNotification>();
+                        if (item.Buttons != null && item.Buttons.Count > 0)
                         {
-                            button1 = CreateButtonNotification(item.Links[0]);
+                            foreach (var btn in item.Buttons)
+                            {
+                                buttons.Add(CreateButtonNotification(btn));
+                            }
+                        }
+                        // Для обратной совместимости: если есть Links, но нет Buttons
+                        else if (item.Links != null && item.Links.Count > 0)
+                        {
+                            foreach (var link in item.Links)
+                            {
+                                buttons.Add(CreateButtonNotification(link));
+                            }
                         }
 
-                        // Создаем вторую кнопку, если есть минимум 2 ссылки
-                        if (item.Links != null && item.Links.Count > 1)
+                        // Создаем поле ввода, если есть
+                        InputField inputField = null;
+                        if (item.Input != null)
                         {
-                            button2 = CreateButtonNotification(item.Links[1]);
+                            inputField = new InputField(
+                                item.Input.Type,
+                                item.Input.Placeholder,
+                                item.Input.Required,
+                                item.Input.MaxLength,
+                                ""
+                            );
                         }
 
-                        new Notification(
-                            item.Header,
-                            item.Message,
-                            button1,
-                            button2
-                        );
+                        // Определяем, нужно ли показывать до ответа
+                        bool showUntilAnswered = item.Type == NotificationType.Survey && item.ShowUntilAnswered;
+
+                        // Создаем уведомление
+                        if (item.Type == NotificationType.Survey)
+                        {
+                            new Notification(
+                                item.Header,
+                                item.Message,
+                                buttons,
+                                inputField,
+                                showUntilAnswered,
+                                item.DismissButton,
+                                item.Id
+                            );
+                        }
+                        else
+                        {
+                            // Стандартное уведомление (для обратной совместимости используем старый конструктор)
+                            // Но поддерживаем список кнопок
+                            var notification = new Notification(item.Header, item.Message);
+                            notification.Type = NotificationType.Standard;
+                            notification.Buttons.AddRange(buttons);
+                            if (inputField != null)
+                                notification.InputField = inputField;
+                            // Если есть ID, устанавливаем SurveyId (может быть полезно для отслеживания)
+                            if (item.Id > 0)
+                                notification.SurveyId = item.Id;
+                        }
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Ошибка создания уведомления: {ex.Message}");
+                    }
                 }
             }
-            catch { 
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Ошибка загрузки уведомлений: {ex.Message}");
             }
-
         }
 
         private ButtonNotification CreateButtonNotification(NotificationLink link)
         {
+            // Используем новый конструктор с ActionType.Url
             return new ButtonNotification(
                 link.Name,
-                new Action(() =>
-                {
-                    Process.Start(new ProcessStartInfo
-                    {
-                        UseShellExecute = true,
-                        FileName = link.Url
-                    });
-                }),
+                ButtonActionType.Url,
+                link.Url,
+                true // закрыть уведомление после нажатия
+            );
+        }
+
+        private ButtonNotification CreateButtonNotification(NotificationButton button)
+        {
+            // Используем конструктор с ActionType и ActionValue
+            // closeNotification = true, чтобы уведомление закрывалось после нажатия
+            return new ButtonNotification(
+                button.Text,
+                button.Action,
+                button.Value,
                 true
             );
         }

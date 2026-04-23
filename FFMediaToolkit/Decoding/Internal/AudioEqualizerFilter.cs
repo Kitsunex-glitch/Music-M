@@ -59,27 +59,37 @@ namespace FFMediaToolkit.Decoding.Internal
 
             AVFilterContext* prevCtx = buffersrcCtx;
             AVFilterContext* eqCtx = null;
-            for (int i = 0; i < eqFilters.Length; i++)
+            if (eqFilters.Length > 0)
             {
-                string singleEqArgs = eqFilters[i];
-                AVFilter* eqFilter = ffmpeg.avfilter_get_by_name("equalizer");
-                if (eqFilter == null)
-                    throw new Exception("FFmpeg: Фильтр 'equalizer' не найден! Проверьте сборку FFmpeg.");
-                System.Diagnostics.Debug.WriteLine($"[FFMedia] Попытка создать фильтр equalizer с параметрами: {singleEqArgs}");
-                int eqRes = ffmpeg.avfilter_graph_create_filter(&eqCtx, eqFilter, $"eq{i}", singleEqArgs, null, filterGraph);
-                System.Diagnostics.Debug.WriteLine($"[FFMedia] eqRes={eqRes}, eqCtx==null? {eqCtx == null}");
-                if (eqRes < 0 || eqCtx == null)
-                    throw new Exception($"Не удалось создать фильтр equalizer. Код ошибки: {eqRes}, строка: {singleEqArgs}");
+                for (int i = 0; i < eqFilters.Length; i++)
+                {
+                    string singleEqArgs = eqFilters[i];
+                    AVFilter* eqFilter = ffmpeg.avfilter_get_by_name("equalizer");
+                    if (eqFilter == null)
+                        throw new Exception("FFmpeg: Фильтр 'equalizer' не найден! Проверьте сборку FFmpeg.");
+                    System.Diagnostics.Debug.WriteLine($"[FFMedia] Попытка создать фильтр equalizer с параметрами: {singleEqArgs}");
+                    int eqRes = ffmpeg.avfilter_graph_create_filter(&eqCtx, eqFilter, $"eq{i}", singleEqArgs, null, filterGraph);
+                    System.Diagnostics.Debug.WriteLine($"[FFMedia] eqRes={eqRes}, eqCtx==null? {eqCtx == null}");
+                    if (eqRes < 0 || eqCtx == null)
+                        throw new Exception($"Не удалось создать фильтр equalizer. Код ошибки: {eqRes}, строка: {singleEqArgs}");
 
-                int link = ffmpeg.avfilter_link(prevCtx, 0, eqCtx, 0);
-                if (link < 0)
-                    throw new Exception($"Ошибка линковки фильтров. Код: {link}");
-                prevCtx = eqCtx;
+                    int link = ffmpeg.avfilter_link(prevCtx, 0, eqCtx, 0);
+                    if (link < 0)
+                        throw new Exception($"Ошибка линковки фильтров. Код: {link}");
+                    prevCtx = eqCtx;
+                }
+
+                int link2 = ffmpeg.avfilter_link(eqCtx, 0, buffersinkCtx, 0);
+                if (link2 < 0)
+                    throw new Exception($"Ошибка линковки eq->abuffersink. Код: {link2}");
             }
-
-            int link2 = ffmpeg.avfilter_link(eqCtx, 0, buffersinkCtx, 0);
-            if (link2 < 0)
-                throw new Exception($"Ошибка линковки eq->abuffersink. Код: {link2}");
+            else
+            {
+                // Нет фильтров - линкуем источник напрямую к приемнику
+                int link2 = ffmpeg.avfilter_link(buffersrcCtx, 0, buffersinkCtx, 0);
+                if (link2 < 0)
+                    throw new Exception($"Ошибка линковки buffersrc->buffersink. Код: {link2}");
+            }
 
             int graphRes = ffmpeg.avfilter_graph_config(filterGraph, null);
             if (graphRes < 0)

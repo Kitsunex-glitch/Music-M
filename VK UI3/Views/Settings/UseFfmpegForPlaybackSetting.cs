@@ -35,7 +35,7 @@ namespace VK_UI3.Views.Settings
             this.DispatcherQueue.TryEnqueue(async () =>
             {
                 var setting = SettingsTable.GetSetting("useFfmpegForPlayback");
-                this.IsChecked = setting != null && setting.settingValue.Equals("1");
+                this.IsChecked = setting == null || setting.settingValue.Equals("1");
             });
         }
 

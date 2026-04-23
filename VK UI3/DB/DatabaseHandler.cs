@@ -48,6 +48,7 @@ namespace VK_UI3.DB
                     _db.CreateTable<PathTable>();
                     _db.CreateTable<SettingsTable>();
                     _db.CreateTable<SkipPerfmormer>();
+                    _db.CreateTable<SurveyResponse>();
 
                 }
                 catch (SQLiteException ex)
@@ -61,6 +62,7 @@ namespace VK_UI3.DB
                         _db.CreateTable<PathTable>();
                         _db.CreateTable<SettingsTable>();
                         _db.CreateTable<SkipPerfmormer>();
+                        _db.CreateTable<SurveyResponse>();
                     }
                     else
                     {

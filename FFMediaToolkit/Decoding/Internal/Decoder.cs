@@ -36,9 +36,10 @@
             {
                 case MediaType.Audio:
                     RecentlyDecodedFrame = new AudioFrame();
-                    if (owner.Options?.EqualizerArgs != null)
+                    var eqArgs = owner.Options?.EqualizerArgs;
+                    if (!string.IsNullOrWhiteSpace(eqArgs))
                     {
-                        equalizerFilter = new AudioEqualizerFilter(codec, owner.Options.EqualizerArgs);
+                        equalizerFilter = new AudioEqualizerFilter(codec, eqArgs);
                     }
                     break;
                 case MediaType.Video:

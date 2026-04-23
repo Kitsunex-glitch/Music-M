@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Windows.Data.Json;
+using VK_UI3.Views.Notification;
+using VK_UI3.DB;
 
 namespace VK_UI3.Helpers
 {
@@ -12,12 +14,33 @@ namespace VK_UI3.Helpers
         public string Header { get; set; }
         public string Message { get; set; }
         public List<NotificationLink> Links { get; set; } = new List<NotificationLink>();
+        // Новые поля для расширенного формата
+        public NotificationType Type { get; set; } = NotificationType.Standard;
+        public List<NotificationButton> Buttons { get; set; } = new List<NotificationButton>();
+        public NotificationInput Input { get; set; }
+        public bool ShowUntilAnswered { get; set; }
+        public string DismissButton { get; set; }
     }
 
     public class NotificationLink
     {
         public string Name { get; set; }
         public string Url { get; set; }
+    }
+
+    public class NotificationButton
+    {
+        public string Text { get; set; }
+        public ButtonActionType Action { get; set; }
+        public string Value { get; set; }
+    }
+
+    public class NotificationInput
+    {
+        public InputFieldType Type { get; set; }
+        public string Placeholder { get; set; }
+        public bool Required { get; set; }
+        public int? MaxLength { get; set; }
     }
 
     internal class NotificationsGetter
@@ -77,16 +100,13 @@ namespace VK_UI3.Helpers
                         JsonObject jsonObject = item.GetObject();
                         var notification = new NotificationItem();
 
-                        // Парсинг обязательных полей
+                        // Парсинг ID (сохраняем во временную переменную, пока не знаем тип)
+                        int notificationId = 0;
                         if (jsonObject.ContainsKey("id"))
                         {
-                            if (lastID >= (int)jsonObject["id"].GetNumber())
-                                continue;
-                            notification.Id = (int)jsonObject["id"].GetNumber();
-
-                            DB.SettingsTable.SetSetting("noteLastId", ((int)jsonObject["id"].GetNumber()).ToString());
+                            notificationId = (int)jsonObject["id"].GetNumber();
+                            // Пока не устанавливаем notification.Id, сделаем позже после проверок
                         }
-
 
                         if (jsonObject.ContainsKey("Header"))
                             notification.Header = jsonObject["Header"].GetString();
@@ -94,8 +114,44 @@ namespace VK_UI3.Helpers
                         if (jsonObject.ContainsKey("Message"))
                             notification.Message = jsonObject["Message"].GetString();
 
-                        // Парсинг ссылок (опционально)
-                        if (jsonObject.ContainsKey("links"))
+                        // Определение типа уведомления
+                        if (jsonObject.ContainsKey("type"))
+                        {
+                            string typeStr = jsonObject["type"].GetString();
+                            if (Enum.TryParse(typeStr, true, out NotificationType type))
+                                notification.Type = type;
+                        }
+
+                        // Парсинг кнопок (новый формат)
+                        if (jsonObject.ContainsKey("buttons"))
+                        {
+                            JsonArray buttonsArray = jsonObject["buttons"].GetArray();
+                            foreach (IJsonValue buttonValue in buttonsArray)
+                            {
+                                if (buttonValue.ValueType == JsonValueType.Object)
+                                {
+                                    JsonObject buttonObject = buttonValue.GetObject();
+                                    var button = new NotificationButton();
+
+                                    if (buttonObject.ContainsKey("text"))
+                                        button.Text = buttonObject["text"].GetString();
+
+                                    if (buttonObject.ContainsKey("action"))
+                                    {
+                                        string actionStr = buttonObject["action"].GetString();
+                                        if (Enum.TryParse(actionStr, true, out ButtonActionType action))
+                                            button.Action = action;
+                                    }
+
+                                    if (buttonObject.ContainsKey("value"))
+                                        button.Value = buttonObject["value"].GetString();
+
+                                    notification.Buttons.Add(button);
+                                }
+                            }
+                        }
+                        // Парсинг ссылок (старый формат) - преобразуем в кнопки с действием Url
+                        else if (jsonObject.ContainsKey("links"))
                         {
                             JsonArray linksArray = jsonObject["links"].GetArray();
                             foreach (IJsonValue linkValue in linksArray)
@@ -103,17 +159,77 @@ namespace VK_UI3.Helpers
                                 if (linkValue.ValueType == JsonValueType.Object)
                                 {
                                     JsonObject linkObject = linkValue.GetObject();
-                                    var link = new NotificationLink();
+                                    var button = new NotificationButton();
 
                                     if (linkObject.ContainsKey("name"))
-                                        link.Name = linkObject["name"].GetString();
+                                        button.Text = linkObject["name"].GetString();
 
                                     if (linkObject.ContainsKey("url"))
-                                        link.Url = linkObject["url"].GetString();
+                                    {
+                                        button.Action = ButtonActionType.Url;
+                                        button.Value = linkObject["url"].GetString();
+                                    }
 
-                                    notification.Links.Add(link);
+                                    notification.Buttons.Add(button);
                                 }
                             }
+                        }
+
+                        // Парсинг поля ввода
+                        if (jsonObject.ContainsKey("input"))
+                        {
+                            JsonObject inputObject = jsonObject["input"].GetObject();
+                            var input = new NotificationInput();
+
+                            if (inputObject.ContainsKey("type"))
+                            {
+                                string typeStr = inputObject["type"].GetString();
+                                if (Enum.TryParse(typeStr, true, out InputFieldType type))
+                                    input.Type = type;
+                            }
+
+                            if (inputObject.ContainsKey("placeholder"))
+                                input.Placeholder = inputObject["placeholder"].GetString();
+
+                            if (inputObject.ContainsKey("required"))
+                                input.Required = inputObject["required"].GetBoolean();
+
+                            if (inputObject.ContainsKey("maxLength"))
+                                input.MaxLength = (int)inputObject["maxLength"].GetNumber();
+
+                            notification.Input = input;
+                        }
+
+                        if (jsonObject.ContainsKey("showUntilAnswered"))
+                            notification.ShowUntilAnswered = jsonObject["showUntilAnswered"].GetBoolean();
+
+                        if (jsonObject.ContainsKey("dismissButton"))
+                            notification.DismissButton = jsonObject["dismissButton"].GetString();
+
+                        // Теперь, когда известны Type и ShowUntilAnswered, применяем фильтрацию по lastID
+                        bool isSurveyWithShowUntil = notification.Type == NotificationType.Survey && notification.ShowUntilAnswered;
+
+                        // Для не-опросников (или опросников без ShowUntilAnswered) применяем фильтр lastID
+                        if (!isSurveyWithShowUntil && lastID >= notificationId)
+                            continue;
+
+                        // Устанавливаем ID
+                        notification.Id = notificationId;
+
+                        // Обновляем noteLastId только для не-опросников (чтобы опросники показывались до ответа)
+                        if (!isSurveyWithShowUntil)
+                        {
+                            DB.SettingsTable.SetSetting("noteLastId", notificationId.ToString());
+                        }
+
+                        // Проверка, был ли уже ответ на опрос (если ShowUntilAnswered = true)
+                        if (notification.Type == NotificationType.Survey && notification.ShowUntilAnswered)
+                        {
+                            // TODO: Проверить в БД, отвечен ли уже этот опрос
+                            // Если отвечен, пропустить уведомление
+                            bool answered = SurveyResponseManager.HasResponse(notification.Id);
+                            if (answered)
+                                continue;
                         }
 
                         notifications.Add(notification);

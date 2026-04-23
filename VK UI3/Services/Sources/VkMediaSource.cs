@@ -78,17 +78,21 @@ public class VkMediaSource : MediaSourceBase
 
             if (equalizer == null)
             {
+                System.Diagnostics.Debug.WriteLine("[FFMedia] Equalizer is null, clearing audio filters");
                 rtMediaSource.ClearFFmpegAudioFilters();
             }
             else
             {
                 string filterString = equalizer.GetFFmpegFilterString();
+                System.Diagnostics.Debug.WriteLine($"[FFMedia] Equalizer filter string: '{filterString}'");
                 if (!string.IsNullOrEmpty(filterString))
                 {
+                    System.Diagnostics.Debug.WriteLine($"[FFMedia] Setting audio filters: {filterString}");
                     rtMediaSource.SetFFmpegAudioFilters(filterString, rtMediaSource.AudioStreams.First());
                 }
                 else
                 {
+                    System.Diagnostics.Debug.WriteLine("[FFMedia] Filter string empty, clearing audio filters");
                     rtMediaSource.ClearFFmpegAudioFilters();
                 }
             }
@@ -119,10 +123,16 @@ public class VkMediaSource : MediaSourceBase
             if (equalizer != null)
             {
                 string filterString = equalizer.GetFFmpegFilterString();
+                System.Diagnostics.Debug.WriteLine($"[FFMedia] FFMediaToolkit equalizer filter string: '{filterString}'");
                 if (!string.IsNullOrEmpty(filterString))
                 {
                     // Добавляем loudnorm после эквалайзера
                     mediaOptions.EqualizerArgs = $"{filterString}";
+                    System.Diagnostics.Debug.WriteLine($"[FFMedia] Set EqualizerArgs: {mediaOptions.EqualizerArgs}");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("[FFMedia] Filter string empty, EqualizerArgs remains null");
                 }
             }
 

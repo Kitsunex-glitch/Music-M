@@ -19,14 +19,12 @@
 		<Grid.RowDefinitions>
 			<RowDefinition Height="auto" />
 			<RowDefinition Height="auto" />
-
 			<RowDefinition Height="auto" />
-
 			<RowDefinition Height="auto" />
-            <RowDefinition Height="auto" />
-
-
-        </Grid.RowDefinitions>
+			<RowDefinition Height="auto" />
+			<RowDefinition Height="auto" />
+			<RowDefinition Height="auto" />
+		</Grid.RowDefinitions>
 
 		<TextBlock
 			x:Name="HeaderB"
@@ -51,16 +49,67 @@
 			HorizontalAlignment="Stretch"
 			VerticalAlignment="Stretch"
 			Visibility="Collapsed" />
-		<Grid
-			x:Name="BTNsGrid"
+
+		<!-- Поле ввода для опросников -->
+		<StackPanel
+			x:Name="InputPanel"
 			Grid.Row="3"
 			Margin="0,0,0,10"
-			HorizontalAlignment="Stretch"
-			ColumnSpacing="5"
-			RowSpacing="5"
-			Visibility="Collapsed" />
-		<Button
+			Visibility="Collapsed"
+			Spacing="5">
+			<TextBox
+				x:Name="InputTextBox"
+				PlaceholderText="Введите ответ"
+				HorizontalAlignment="Stretch"
+				TextWrapping="Wrap"
+				AcceptsReturn="True"
+				MaxHeight="100"
+				Visibility="Collapsed"/>
+			<Button
+				x:Name="SubmitInputButton"
+				Content="Отправить"
+				HorizontalAlignment="Stretch"
+				Click="SubmitInputButton_Click"
+				Visibility="Collapsed"/>
+		</StackPanel>
+
+		<!-- Динамические кнопки -->
+		<ItemsControl
+			x:Name="ButtonsItemsControl"
 			Grid.Row="4"
+			Margin="0,0,0,10"
+			HorizontalAlignment="Stretch"
+			Visibility="Collapsed">
+			<ItemsControl.ItemsPanel>
+				<ItemsPanelTemplate>
+					<StackPanel Orientation="Vertical" Spacing="5"/>
+				</ItemsPanelTemplate>
+			</ItemsControl.ItemsPanel>
+			<ItemsControl.ItemTemplate>
+				<DataTemplate>
+					<Button
+						Content="{Binding Text}"
+						HorizontalAlignment="Stretch"
+						Click="DynamicButton_Click"
+						Tag="{Binding}"/>
+				</DataTemplate>
+			</ItemsControl.ItemTemplate>
+		</ItemsControl>
+
+		<!-- Кнопка "Не хочу отвечать" -->
+		<Button
+			x:Name="DismissButton"
+			Grid.Row="5"
+			HorizontalAlignment="Stretch"
+			Margin="0,0,0,10"
+			Click="DismissButton_Click"
+			Visibility="Collapsed">
+			Не хочу отвечать
+		</Button>
+
+		<!-- Кнопка закрытия -->
+		<Button
+			Grid.Row="6"
 			HorizontalAlignment="Stretch"
 			Click="Button_Click">
 			Закрыть
