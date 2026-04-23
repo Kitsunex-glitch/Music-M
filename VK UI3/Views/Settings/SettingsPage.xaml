@@ -95,6 +95,10 @@
                 <local:UseFfmpegForPlaybackSetting AutomationProperties.HelpText="Включает или выключает использование FFMPEG для декодирования аудио" AutomationProperties.Name="Использовать FFMPEG для воспроизведения" />
             </Border>
 
+            <Border>
+                <local:DisableNavigationAnimationsSetting AutomationProperties.HelpText="Включает или выключает анимации при переходе между разделами. Отключение анимаций может ускорить восприятие загрузки." AutomationProperties.Name="Отключить анимации переходов" />
+            </Border>
+
             <local:FfmpegSettingsExpander Margin="5" AutomationProperties.HelpText="Настройки параметров FFMPEG для воспроизведения аудио" AutomationProperties.Name="Настройки FFMPEG" />
 
 
