@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Shapes;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Windows.UI;
 
 
@@ -49,6 +50,53 @@ namespace VK_UI3.SnowFlake
             }
         }
 
+        public bool UseRainbowColors
+        {
+            get { return (bool)GetValue(UseRainbowColorsProperty); }
+            set { SetValue(UseRainbowColorsProperty, value); }
+        }
+
+        public static readonly DependencyProperty UseRainbowColorsProperty =
+            DependencyProperty.Register(nameof(UseRainbowColors), typeof(bool), typeof(SnowFlakeEffect),
+                new PropertyMetadata(false, OnColorPropertyChanged));
+
+        public Color FlakeColor
+        {
+            get { return (Color)GetValue(FlakeColorProperty); }
+            set { SetValue(FlakeColorProperty, value); }
+        }
+
+        public static readonly DependencyProperty FlakeColorProperty =
+            DependencyProperty.Register(nameof(FlakeColor), typeof(Color), typeof(SnowFlakeEffect),
+                new PropertyMetadata(Color.FromArgb(255, 255, 255, 255), OnColorPropertyChanged));
+
+        private static void OnColorPropertyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            var ctl = (SnowFlakeEffect)d;
+            if (ctl != null)
+            {
+                ctl.Stop();
+                ctl.Start();
+            }
+        }
+
+        // Массив предопределенных цветов для радужных снежинок
+        private static readonly Color[] RainbowColors = new Color[]
+        {
+            Color.FromArgb(255, 255, 0, 0),      // Красный
+            Color.FromArgb(255, 255, 165, 0),    // Оранжевый
+            Color.FromArgb(255, 255, 255, 0),    // Желтый
+            Color.FromArgb(255, 0, 128, 0),      // Зеленый
+            Color.FromArgb(255, 0, 191, 255),    // Голубой
+            Color.FromArgb(255, 0, 0, 255),      // Синий
+            Color.FromArgb(255, 128, 0, 128),    // Фиолетовый
+            Color.FromArgb(255, 255, 192, 203),  // Розовый
+            Color.FromArgb(255, 0, 255, 255),    // Бирюзовый
+            Color.FromArgb(255, 255, 215, 0),    // Золотой
+            Color.FromArgb(255, 138, 43, 226),   // Сине-фиолетовый
+            Color.FromArgb(255, 50, 205, 50),    // Лаймовый
+        };
+
         public SnowFlakeEffect()
         {
             DefaultStyleKey = typeof(SnowFlakeEffect);
@@ -58,9 +106,6 @@ namespace VK_UI3.SnowFlake
         {
             base.OnApplyTemplate();
             _canvas = GetTemplateChild(PART_Canvas) as Canvas;
-
-        //    PointerMoved -= OnPointerMove;
-        //    PointerMoved += OnPointerMove;
 
             SizeChanged -= OnSizeChanged;
             SizeChanged += OnSizeChanged;
@@ -84,7 +129,6 @@ namespace VK_UI3.SnowFlake
         private void OnUnLoaded(object sender, RoutedEventArgs e)
         {
             Stop();
-        //    PointerMoved -= OnPointerMove;
             SizeChanged -= OnSizeChanged;
             Unloaded -= OnUnLoaded;
         }
@@ -118,6 +162,35 @@ namespace VK_UI3.SnowFlake
             CompositionTarget.Rendering += UpdateSnowFlakes;
         }
 
+        private Color GetFlakeColor()
+        {
+            // Случайная прозрачность от 0.5 до 1.0
+            double alphaVariation = _random.NextDouble() * 0.5 + 0.5;
+
+            if (UseRainbowColors)
+            {
+                // Случайный выбор цвета из радужного массива
+                Color rainbowColor = RainbowColors[_random.Next(RainbowColors.Length)];
+                return Color.FromArgb(
+                    (byte)(alphaVariation * 255),
+                    rainbowColor.R,
+                    rainbowColor.G,
+                    rainbowColor.B
+                );
+            }
+            else
+            {
+                // Используем выбранный пользователем цвет, но с случайной вариацией яркости
+                double brightnessVariation = _random.NextDouble() * 0.3 + 0.7; // 70-100% яркости
+                return Color.FromArgb(
+                    (byte)(alphaVariation * 255),
+                    (byte)(FlakeColor.R * brightnessVariation),
+                    (byte)(FlakeColor.G * brightnessVariation),
+                    (byte)(FlakeColor.B * brightnessVariation)
+                );
+            }
+        }
+
         private void CreateSnowFlake()
         {
             double size = (_random.NextDouble() * 3) + 2; // Snowflake size
@@ -126,11 +199,17 @@ namespace VK_UI3.SnowFlake
             double x = _random.NextDouble() * _canvas.ActualWidth; // Initial X position
             double y = _random.NextDouble() * _canvas.ActualHeight; // Initial Y position
 
+            Color flakeColor = GetFlakeColor();
+
             Ellipse flakeShape = new()
             {
                 Width = size,
                 Height = size,
-                Fill = new SolidColorBrush(Color.FromArgb((byte)(opacity * 255), 255, 255, 255)),
+                Fill = new SolidColorBrush(Color.FromArgb(
+                    (byte)(opacity * 255),
+                    flakeColor.R,
+                    flakeColor.G,
+                    flakeColor.B)),
             };
 
             var transform = new TranslateTransform();
@@ -154,6 +233,7 @@ namespace VK_UI3.SnowFlake
                 Step = 0,
                 Angle = 180,
                 Transform = transform,
+                Color = flakeColor,
             };
 
             _snowFlakes.Add(flake);
@@ -224,6 +304,7 @@ namespace VK_UI3.SnowFlake
             flake.VelY = flake.Speed;
             flake.VelX = 0;
             flake.Opacity = (_random.NextDouble() * 0.5) + 0.3;
+            flake.Color = GetFlakeColor();
 
             if (flake.Shape == null)
             {
@@ -234,7 +315,11 @@ namespace VK_UI3.SnowFlake
             flake.Shape.SetValue(FrameworkElement.HeightProperty, flake.Size);
             flake.Shape.SetValue(
                 Shape.FillProperty,
-                new SolidColorBrush(Color.FromArgb((byte)(flake.Opacity * 255), 255, 255, 255))
+                new SolidColorBrush(Color.FromArgb(
+                    (byte)(flake.Opacity * 255),
+                    flake.Color.R,
+                    flake.Color.G,
+                    flake.Color.B))
             );
         }
 
@@ -248,14 +333,6 @@ namespace VK_UI3.SnowFlake
             _snowFlakes.Clear();
         }
 
-        /*
-        private void OnPointerMove(object sender, PointerRoutedEventArgs e)
-        {
-            var pos = e.GetCurrentPoint(_canvas);
-            mX = pos.Position.X;
-            mY = pos.Position.Y;
-        }
-        */
         private void OnSizeChanged(object sender, SizeChangedEventArgs e)
         {
             _canvas.SetValue(FrameworkElement.WidthProperty, e.NewSize.Width);

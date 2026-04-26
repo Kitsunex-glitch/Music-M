@@ -4,6 +4,9 @@ namespace MusicX.Core.Models
 {
     public class OptionButton
     {
+        [JsonExtensionData]
+        private Dictionary<string, object> AdditionalData { get; set; }
+
         [JsonProperty("replacement_id")]
         public string ReplacementId { get; set; }
 

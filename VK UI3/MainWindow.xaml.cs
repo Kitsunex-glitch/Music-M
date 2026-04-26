@@ -214,7 +214,7 @@ namespace VK_UI3
 
         private void InitializeUIComponents()
         {
-            VK.api.RequestsPerSecond = 50;
+            VK.api.RequestsPerSecond = 150;
             CheckMica();
             updateMica += OnUpdateMica;
 
@@ -559,10 +559,16 @@ namespace VK_UI3
             {
                 snow.Start();
                 SetFlakeCount();
+                SetRainbowMode();
+                SetFlakeColor();
             }
             else
             {
                 snow.Stop();
+                // Устанавливаем свойства, даже если снежинки выключены
+                SetFlakeCount();
+                SetRainbowMode();
+                SetFlakeColor();
             }
 
             
@@ -577,6 +583,8 @@ namespace VK_UI3
             {
                 snow.Start();
                 SetFlakeCount();
+                SetRainbowMode();
+                SetFlakeColor();
             }
         }
 
@@ -597,6 +605,47 @@ namespace VK_UI3
 
             // Значение по умолчанию при некорректных данных
             return 100;
+        }
+
+        private void SetRainbowMode()
+        {
+            var rainbowSetting = SettingsTable.GetSetting("snowflakesUseRainbowColors");
+            snow.UseRainbowColors = rainbowSetting != null && rainbowSetting.settingValue.Equals("1");
+        }
+
+        private void SetFlakeColor()
+        {
+            var colorSetting = SettingsTable.GetSetting("snowflakesColor");
+            if (colorSetting != null && !string.IsNullOrEmpty(colorSetting.settingValue))
+            {
+                try
+                {
+                    string colorStr = colorSetting.settingValue.Trim();
+                    if (colorStr.StartsWith("#"))
+                    {
+                        colorStr = colorStr.Substring(1);
+                        if (colorStr.Length == 6)
+                        {
+                            colorStr = "FF" + colorStr;
+                        }
+                        if (colorStr.Length == 8)
+                        {
+                            byte a = Convert.ToByte(colorStr.Substring(0, 2), 16);
+                            byte r = Convert.ToByte(colorStr.Substring(2, 2), 16);
+                            byte g = Convert.ToByte(colorStr.Substring(4, 2), 16);
+                            byte b = Convert.ToByte(colorStr.Substring(6, 2), 16);
+                            snow.FlakeColor = Windows.UI.Color.FromArgb(a, r, g, b);
+                            return;
+                        }
+                    }
+                }
+                catch
+                {
+                    // В случае ошибки используем цвет по умолчанию
+                }
+            }
+            // Цвет по умолчанию (белый)
+            snow.FlakeColor = Windows.UI.Color.FromArgb(255, 255, 255, 255);
         }
 
         public VK_UI3.SnowFlake.SnowFlakeEffect Snow { get { return snow; }  }

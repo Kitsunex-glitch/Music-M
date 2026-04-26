@@ -42,13 +42,13 @@ namespace VK_UI3.Services.Player
 
             if (msg == WM_APPCOMMAND)
             {
-                // Из старого кода: int cmd = HIWORD(wParam) & ~APPCOMMAND_MASK;
-                // HIWORD - получить старшее слово (16-31 биты)
+                // Согласно документации Microsoft, команда находится в HIWORD(lParam)
+                // https://learn.microsoft.com/en-us/windows/win32/inputdev/wm-appcommand
                 const int APPCOMMAND_MASK = 0xF000;
-                int cmd = (int)((wParam.ToInt64() >> 16) & 0xFFFF) & ~APPCOMMAND_MASK;
+                int cmd = (int)((lParam.ToInt64() >> 16) & 0xFFFF) & ~APPCOMMAND_MASK;
 
                 // Для отладки
-                System.Diagnostics.Debug.WriteLine($"APPCOMMAND received: cmd={cmd}");
+                System.Diagnostics.Debug.WriteLine($"APPCOMMAND received: cmd={cmd} (lParam=0x{lParam.ToInt64():X8})");
 
                 switch (cmd)
                 {

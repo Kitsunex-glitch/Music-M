@@ -4,6 +4,9 @@ namespace MusicX.Core.Models
 {
     public class ActionButton
     {
+        [JsonExtensionData]
+        private Dictionary<string, object> AdditionalData { get; set; }
+
         [JsonProperty("type")]
         public string Type { get; set; }
 

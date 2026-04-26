@@ -83,30 +83,33 @@ namespace MusicX.Core.Models
         [JsonProperty("music_owners_ids")]
         public List<string> MusicOwnerIds { get; set; } = new List<string>();
 
+        [JsonProperty("market_item_ids")]
+        public List<string> MarketItemIds { get; set; } = new List<string>();
+
+        [JsonProperty("market_items")]
+        public List<MarketItem> MarketItems { get; set; } = new List<MarketItem>();
+
         [JsonProperty("audio_followings_update_info_ids")]
         public List<string> FollowingUpdateInfoIds { get; set; } = new List<string>();
 
         [JsonProperty("group_items")]
         public List<CuratorGroup> GroupsItemsIds { get; set; } = new List<CuratorGroup>();
 
+        [JsonProperty("concerts_ids")]
+        public List<string> ConcertsIds { get; set; } = new List<string>();
+
+        [JsonProperty("concerts")]
+        public List<Concert> Concerts { get; set; } = new List<Concert>();
+
         [JsonExtensionData]
         public Dictionary<string, object> AdditionalData { get; set; }
 
+        // Остальные коллекции...
         public List<Curator> Curators { get; set; } = new List<Curator>();
         public List<Text> Texts { get; set; } = new List<Text>();
         public List<Audio> Audios { get; set; } = new List<Audio>();
-
-        [JsonProperty("Playlists")]
         public List<Playlist> Playlists { get; set; } = new List<Playlist>();
-
-        [JsonProperty("Banners")]
         public List<CatalogBanner> Banners { get; set; } = new List<CatalogBanner>();
-
-        [JsonProperty("meta")]
-        public MetaBLock? Meta { get; set; }
-
-
-
         public List<Link> Links { get; set; } = new List<Link>();
         public List<Suggestion> Suggestions { get; set; } = new List<Suggestion>();
         public List<Artist> Artists { get; set; } = new List<Artist>();
@@ -117,14 +120,13 @@ namespace MusicX.Core.Models
         public List<RecommendedPlaylist> RecommendedPlaylists { get; set; } = new List<RecommendedPlaylist>();
         public List<Video> Videos { get; set; } = new List<Video>();
         public List<Video> ArtistVideos { get; set; } = new List<Video>();
-
         public List<Placeholder> Placeholders { get; set; } = new List<Placeholder>();
-
         public List<MusicOwner> MusicOwners { get; set; } = new List<MusicOwner>();
-
         public List<AudioFollowingsUpdateInfo> FollowingsUpdateInfos { get; set; } = new List<AudioFollowingsUpdateInfo>();
-
         public List<Station> Stations { get; set; } = new List<Station>();
+
+        [JsonProperty("meta")]
+        public MetaBLock? Meta { get; set; }
     }
 
     public class MetaBLock

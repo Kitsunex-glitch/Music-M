@@ -34,29 +34,40 @@ namespace VK_UI3.Controls.Blocks
             {
                 var action = item;
 
-                var text = new TextBlock();
-
-
-                var button = new BlockButtonView()
+                // Проверяем, является ли кнопка микса артиста (есть MixId или Images)
+                if (!string.IsNullOrEmpty(action.MixId) || (action.Images != null && action.Images.Count > 0))
                 {
-                    Margin = new Thickness(0, 10, 15, 10),
-                    DataContext = new BlockBTN(action, parentBlock: block),
-                    Height = 45,
-                    blockBTN = new BlockBTN(action, parentBlock: block)
-                };
-
-
-                if (button.DataContext is BlockBTN viewModel)
-                {
-                    button.Command = button.InvokeCommand;
+                    // Создаем ArtistMixButton
+                    var mixButton = new ArtistMixButton()
+                    {
+                        Margin = new Thickness(0, 10, 15, 10),
+                        Width = 200,
+                        Height = 260,
+                        DataContext = action,
+                        Button = action
+                    };
+                    gridV.Items.Add(mixButton);
                 }
+                else
+                {
+                    // Обычная кнопка
+                    var button = new BlockButtonView()
+                    {
+                        Margin = new Thickness(0, 10, 15, 10),
+                        DataContext = new BlockBTN(action, parentBlock: block),
+                        Height = 45,
+                        blockBTN = new BlockBTN(action, parentBlock: block)
+                    };
 
+                    if (button.DataContext is BlockBTN viewModel)
+                    {
+                        button.Command = button.InvokeCommand;
+                    }
 
-                button.MinWidth = 170;
-
-                button.Refresh();
-
-                gridV.Items.Add(button);
+                    button.MinWidth = 170;
+                    button.Refresh();
+                    gridV.Items.Add(button);
+                }
             }
 
         }

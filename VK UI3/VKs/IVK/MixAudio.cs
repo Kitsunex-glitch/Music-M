@@ -16,7 +16,13 @@ namespace VK_UI3.VKs.IVK
     /// <summary>
     /// Опции для микса
     /// </summary>
-    public record MixOptions(string Id, int Append = 0, ImmutableDictionary<string, ImmutableArray<string>>? Options = null)
+    public record MixOptions(
+    string Id,
+    int Append = 0,
+    ImmutableDictionary<string, ImmutableArray<string>>? Options = null,
+    string? PromptEvents = null,
+    string? Ref = null,
+    string? EntityId = null)
     {
         /// <summary>
         /// Получает хэш-код
@@ -25,10 +31,12 @@ namespace VK_UI3.VKs.IVK
         public override int GetHashCode()
         {
             var hashCode = new HashCode();
-            
+
             hashCode.Add(Id);
             hashCode.Add(Append);
+
             if (Options is not null)
+            {
                 foreach (var (key, values) in Options)
                 {
                     hashCode.Add(key);
@@ -37,18 +45,23 @@ namespace VK_UI3.VKs.IVK
                         hashCode.Add(item);
                     }
                 }
-            
+            }
+
+            hashCode.Add(PromptEvents);
+            hashCode.Add(Ref);
+            hashCode.Add(EntityId);
+
             return hashCode.ToHashCode();
         }
     }
-    
+
     /// <summary>
     /// Класс для работы с миксами аудиозаписей
     /// </summary>
     public class MixAudio : IVKGetAudio
     {
         #region Поля и свойства
-        
+        private int append = 1;
         /// <summary>
         /// Данные микса
         /// </summary>
@@ -78,7 +91,7 @@ namespace VK_UI3.VKs.IVK
             {
                 try
                 {
-                    var audios = await VK.vkService.GetStreamMixAudios(data.Id, data.Append, options: data.Options);
+                    var audios = await VK.vkService.GetStreamMixAudios(data.Id, data.Append, 50, options: data.Options, data.PromptEvents, data.Ref, data.EntityId);
                  
                     foreach (var item in audios)
                     {
@@ -157,11 +170,13 @@ namespace VK_UI3.VKs.IVK
                 {
                     try
                     {
-                        var tracks = await VK.vkService.GetStreamMixAudios(data.Id, data.Append+1, options: data.Options);
+                        var tracks = await VK.vkService.GetStreamMixAudios(data.Id, this.append++, 50, options: data.Options, data.PromptEvents, data.Ref, data.EntityId);
                         foreach (var item in tracks)
                         {
                             listAudio.Add(new Helpers.ExtendedAudio(item, this));
                         }
+                        if (listAudio.Count == 0)
+                            itsAll = true;
                     }
                     catch (Exception e)
                     {

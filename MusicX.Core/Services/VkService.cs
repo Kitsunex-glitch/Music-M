@@ -154,20 +154,48 @@ namespace MusicX.Core.Services
 
         }
         private readonly JsonSerializerOptions _jsonSerializerOptions = new(JsonSerializerDefaults.Web);
-        public async Task<List<Audio>> GetStreamMixAudios(string mixId = "common", int append = 0, int count = 50, ImmutableDictionary<string, ImmutableArray<string>>? options = null)
+        public async Task<List<Audio>> GetStreamMixAudios(
+            string mixId = "common",
+            int append = 0,
+            int count = 50,
+            ImmutableDictionary<string, ImmutableArray<string>>? options = null,
+            string? promptEvents = null,
+            string? refParam = null,
+            string? entityId = null)
         {
             try
             {
                 var parameters = new VkParameters
                 {
-
                     {"device_id", await _deviceIdStore.GetDeviceIdAsync()},
-
                     {"mix_id", mixId},
                     {"append", append},
-                    {"count", count},
-                    {"options", options == null ? null : System.Text.Json.JsonSerializer.Serialize(options, _jsonSerializerOptions)}
+                    {"count", count}
                 };
+
+                // Добавляем options, если не null
+                if (options != null)
+                {
+                    parameters.Add("options", System.Text.Json.JsonSerializer.Serialize(options, _jsonSerializerOptions));
+                }
+
+                // Добавляем prompt_events, если не null
+                if (!string.IsNullOrEmpty(promptEvents))
+                {
+                    parameters.Add("prompt_events", promptEvents);
+                }
+
+                // Добавляем ref, если не null
+                if (!string.IsNullOrEmpty(refParam))
+                {
+                    parameters.Add("ref", refParam);
+                }
+
+                // Добавляем entity_id, если не null
+                if (!string.IsNullOrEmpty(entityId))
+                {
+                    parameters.Add("entity_id", entityId);
+                }
 
                 var model = await apiInvoke.CallAsync<List<Audio>>("audio.getStreamMixAudios", parameters);
 
@@ -179,7 +207,6 @@ namespace MusicX.Core.Services
                 logger.Error(ex, ex.Message);
                 throw;
             }
-
         }
 
 
@@ -209,7 +236,7 @@ namespace MusicX.Core.Services
 
                 logger.Info("Successful invoke 'catalog.getAudio' ");
 
-                return model.Proccess();
+                return model.Process();
             }catch(Exception ex)
             {
                 logger.Error("VK API ERROR:");
@@ -254,7 +281,7 @@ namespace MusicX.Core.Services
                 model = JsonConvert.DeserializeObject<ResponseData>(json);
 
                 logger.Info("Successful invoke 'catalog.getSection' ");
-                var a = model.Proccess();
+                var a = model.Process();
 
                 return a;
             }catch (Exception ex)
@@ -289,7 +316,7 @@ namespace MusicX.Core.Services
 
                 logger.Info("Successful invoke 'catalog.getBlockItems' ");
 
-                return model.Proccess();
+                return model.Process();
             }catch(Exception ex)
             {
                 logger.Error("VK API ERROR:");
@@ -327,7 +354,7 @@ namespace MusicX.Core.Services
                 var model = JsonConvert.DeserializeObject<ResponseData>(json);
                 logger.Info("Successful invoke 'catalog.getAudioSearch' ");
 
-                return model.Proccess();
+                return model.Process();
             }catch(Exception ex)
             {
                 logger.Error("VK API ERROR:");
@@ -362,7 +389,7 @@ namespace MusicX.Core.Services
                 logger.Info("Successful invoke 'catalog.getAudioArtist' ");
 
 
-                return model.Proccess();
+                return model.Process();
             }catch (Exception ex)
             {
                 logger.Error("VK API ERROR:");
@@ -397,7 +424,7 @@ namespace MusicX.Core.Services
                 logger.Info("Successful invoke 'catalog.getAudio' ");
 
 
-                return model.Proccess();
+                return model.Process();
             }
             catch (Exception ex)
             {
@@ -435,7 +462,7 @@ namespace MusicX.Core.Services
                 logger.Info("Successful invoke 'catalog.getAudioCurator' ");
 
 
-                return model.Proccess();
+                return model.Process();
             }catch(Exception ex)
             {
                 logger.Error("VK API ERROR:");
@@ -476,7 +503,7 @@ namespace MusicX.Core.Services
                 logger.Info("Successful invoke 'execute.getPlaylist' ");
 
 
-                return model.Proccess();
+                return model.Process();
             }catch(Exception ex)
             {
                 logger.Error("VK API ERROR:");
@@ -749,7 +776,7 @@ namespace MusicX.Core.Services
                 logger.Info("Successful invoke 'catalog.replaceBlocks' ");
 
 
-                return model.Proccess();
+                return model.Process();
             }catch(Exception ex)
             {
                 logger.Error("VK API ERROR:");
@@ -958,7 +985,7 @@ namespace MusicX.Core.Services
                 logger.Info("Successful invoke 'catalog.getAudioCurator' ");
 
 
-                return model.Proccess();
+                return model.Process();
             }
             catch (Exception ex)
             {
@@ -989,7 +1016,7 @@ namespace MusicX.Core.Services
 
             logger.Debug("RESULT OF 'execute'" + json);
 
-            return model.Proccess();
+            return model.Process();
         }
 
         public async Task<ResponseData> GetRecommendationsAudio(string audio)

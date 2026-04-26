@@ -7,6 +7,10 @@ namespace MusicX.Core.Models
 {
     public class Button
     {
+        [JsonExtensionData]
+        private Dictionary<string, object> AdditionalData { get; set; }
+
+
         [JsonProperty("action")]
         public ActionButton Action { get; set; }
 
@@ -39,5 +43,23 @@ namespace MusicX.Core.Models
         
         [JsonProperty("owner_id")]
         public long OwnerId { get; set; }
+        
+        [JsonProperty("description")]
+        public string Description { get; set; }
+        
+        [JsonProperty("images")]
+        public List<Image> Images { get; set; } = new List<Image>();
+        
+        [JsonProperty("foreground_images")]
+        public List<Image> ForegroundImages { get; set; } = new List<Image>();
+        
+        [JsonProperty("id")]
+        public long Id { get; set; }
+        
+        [JsonProperty("mix_id")]
+        public string MixId { get; set; }
+        
+        [JsonProperty("entity_id")]
+        public long EntityId { get; set; }
     }
 }

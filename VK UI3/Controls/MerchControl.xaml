@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="VK_UI3.Controls.MerchControl"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:custom="using:VK_UI3.Helpers.Animations"
+    xmlns:customFlyout="using:VK_UI3.Views.Controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="using:VK_UI3.Controls"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Width="200"
+    Height="260"
+    Margin="3,0,4,6"
+    CornerRadius="8"
+    PointerEntered="UserControl_PointerEntered"
+    PointerExited="UserControl_PointerExited"
+    PointerPressed="UserControl_PointerPressed"
+    Translation="0,0,8"
+    mc:Ignorable="d">
+
+    <UserControl.ContextFlyout>
+        <customFlyout:CustomFlyout x:Name="flyOutm">
+            <MenuFlyoutItem
+                x:Name="ShareItem"
+                Click="ShareItem_Click"
+                Icon="Share"
+                Text="Поделиться" />
+            <MenuFlyoutItem
+                x:Name="OpenInBrowser"
+                Click="OpenInBrowser_Click"
+                Icon="Globe"
+                Text="Открыть в браузере" />
+        </customFlyout:CustomFlyout>
+    </UserControl.ContextFlyout>
+
+
+    <UserControl.Shadow>
+        <ThemeShadow />
+    </UserControl.Shadow>
+    <Grid CornerRadius="8">
+        <StackPanel
+            Padding="10"
+            Background="{ThemeResource LayerOnAccentAcrylicFillColorDefaultBrush}"
+            CornerRadius="8">
+
+            <Grid
+            Width="180"
+            Height="180"
+            Background="{ThemeResource LayerOnAccentAcrylicFillColorDefaultBrush}"
+            CornerRadius="8">
+                <Grid.Resources>
+                    <!--  Анимация прозрачности от 0 до 1  -->
+                    <Storyboard x:Name="FadeInAnimationGridPlayIcon">
+                        <DoubleAnimation
+                        Storyboard.TargetName="btnGrid"
+                        Storyboard.TargetProperty="Opacity"
+                        To="1"
+                        Duration="0:0:0.25" />
+                        <DoubleAnimation
+                        Storyboard.TargetName="BookmarkGrid"
+                        Storyboard.TargetProperty="Opacity"
+                        To="1"
+                        Duration="0:0:0.25" />
+                    </Storyboard>
+                    <!--  Анимация прозрачности от 1 до 0  -->
+                    <Storyboard x:Name="FadeOutAnimationGridPlayIcon">
+                        <DoubleAnimation
+                        Storyboard.TargetName="btnGrid"
+                        Storyboard.TargetProperty="Opacity"
+                        To="0"
+                        Duration="0:0:0.25" />
+                     <DoubleAnimation
+                     Storyboard.TargetName="BookmarkGrid"
+                     Storyboard.TargetProperty="Opacity"
+                     To="0"
+                     Duration="0:0:0.25" />
+                    </Storyboard>
+                </Grid.Resources>
+
+                <Grid>
+                    <FontIcon Glyph="&#xE90B;" />
+                    <Grid Background="{ThemeResource LayerOnAccentAcrylicFillColorDefaultBrush}">
+                        <Image
+                x:Name="MerchImage"
+                Stretch="UniformToFill"
+                Source="{Binding Image[0].Url, FallbackValue=null}" />
+
+                        <!-- Затемняющий слой для неактивных товаров -->
+                        <Border x:Name="OverlayGrid" Background="#CC000000" Opacity="0" />
+
+                        <!-- Текст "НЕ ДОСТУПЕН" на оверлее -->
+                        <TextBlock x:Name="BadgeText"
+                       Text="НЕ ДОСТУПЕН"
+                       Foreground="White"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       FontWeight="Bold"
+                       FontSize="14"
+                       Opacity="0"
+                       Rotation="0" />
+                    </Grid>
+                </Grid>
+
+                <Grid Padding="10">
+                    <Grid
+            x:Name="BookmarkGrid"
+            Width="40"
+            Height="40"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Top"
+            Background="{ThemeResource SystemControlBackgroundAltMediumHighBrush}"
+            CornerRadius="8"
+            Opacity="1">
+                        <Button
+                Background="{ThemeResource LayerOnAccentAcrylicFillColorDefaultBrush}"
+                x:Name="BookmarkButton"
+                Width="40"
+                Height="40"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Click="BookmarkButton_Click"
+                CornerRadius="8"
+                Opacity="1"
+                Translation="0,0,8">
+                            <ImageIcon>
+                                <ImageIcon.Source>
+                                    <SvgImageSource x:Name="BookMarkIcon" 
+                                    UriSource="ms-appx:///Assets/bookmark-white.svg" 
+                                    RasterizePixelHeight="24" 
+                                    RasterizePixelWidth="24" />
+                                </ImageIcon.Source>
+                            </ImageIcon>
+
+
+                        </Button>
+
+                    </Grid>
+                    <Grid
+            x:Name="btnGrid"
+            Width="50"
+            Height="50"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Bottom"
+            Background="{ThemeResource SystemControlBackgroundAltMediumHighBrush}"
+            CornerRadius="100"
+            Opacity="0">
+                        <Button
+                x:Name="ActionButton"
+                Width="50"
+                Height="50"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Click="ActionButton_Click"
+                CornerRadius="50"
+                Opacity="1"
+                Translation="0,0,8">
+                            <FontIcon
+                    x:Name="ActionIcon"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Glyph="&#xE8A7;" />
+                        </Button>
+                    </Grid>
+                </Grid>
+
+                <!-- Динамический стиль для цены: красный если недоступен -->
+                <Grid x:Name="gridPrice"  
+          VerticalAlignment="Bottom" 
+          HorizontalAlignment="Left" 
+          Padding="10,5" 
+          CornerRadius="6" 
+          Margin="4" 
+          Background="{ThemeResource AcrylicBackgroundFillColorDefaultBrush}">
+                    <TextBlock x:Name="TextPrice"  
+                   FontFamily="{ThemeResource VKSansMedium}" 
+                   FontSize="14" />
+                </Grid>
+            </Grid>
+            <StackPanel
+                HorizontalAlignment="Left"
+                Background="Transparent"
+                CornerRadius="0"
+                Orientation="Vertical">
+                <TextBlock
+                    x:Name="Title"
+                    MaxHeight="20"
+                    Margin="0,8,0,4"
+                    FontFamily="{StaticResource VKSansMedium}"
+                    FontSize="14"
+                    TextTrimming="CharacterEllipsis"
+                    TextWrapping="Wrap"
+                    Text="{Binding Title}" />
+                <TextBlock
+                    x:Name="Description"
+                    MaxHeight="40"
+                    FontFamily="{StaticResource VKSansRegular}"
+                    FontSize="12"
+                    Opacity="0.6"
+                    TextTrimming="CharacterEllipsis"
+                    TextWrapping="Wrap"
+                    Text="{Binding Description}" />
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</UserControl>

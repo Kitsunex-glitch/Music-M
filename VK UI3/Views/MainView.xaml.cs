@@ -45,7 +45,7 @@ namespace VK_UI3.Views
     {
         public static MainView mainView;
         private static NavigateFrame frame;
-
+        public NavigateFrame ContentFramePublic => ContentFrame;
 
 
         public MainView()
@@ -378,6 +378,8 @@ namespace VK_UI3.Views
 
 
                     token.ThrowIfCancellationRequested();
+
+                    
                     var updatesSection = await VK.vkService.GetAudioCatalogAsync("https://vk.ru/audio?section=updates");
 
                     token.ThrowIfCancellationRequested();

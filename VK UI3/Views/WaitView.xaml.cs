@@ -52,6 +52,13 @@ namespace VK_UI3.Views
 
         WaitParameters waitParameters;
 
+        private NavigationTransitionInfo GetNavigationTransitionInfo()
+        {
+            var setting = SettingsTable.GetSetting("disableNavigationAnimations");
+            bool animationsDisabled = setting != null && setting.settingValue == "1";
+            return animationsDisabled ? null : new DrillInNavigationTransitionInfo();
+        }
+
         private void WaitView_Unloaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
         {
             MainWindow.onRefreshClicked -= MainWindow_onRefreshClicked;
@@ -63,7 +70,13 @@ namespace VK_UI3.Views
 
         private void MainWindow_onRefreshClicked(object sender, EventArgs e)
         {
-            frameSection.Navigate(typeof(waitPage), null, new DrillInNavigationTransitionInfo());
+            if (MainView.mainView == null ||
+            MainView.mainView.ContentFramePublic?.frameCurrent?.Frame?.Content != this)
+            {
+                return;
+            }
+
+            frameSection.Navigate(typeof(waitPage), null, GetNavigationTransitionInfo());
             LoadAsync();
         }
 
@@ -74,7 +87,7 @@ namespace VK_UI3.Views
         {
 
             frameSection.Navigated += FrameSection_Navigated;
-            frameSection.Navigate(typeof(waitPage), null, new DrillInNavigationTransitionInfo());
+            frameSection.Navigate(typeof(waitPage), null, GetNavigationTransitionInfo());
 
             var waitView = e.Parameter as WaitParameters;
             if (waitView == null)
@@ -146,7 +159,7 @@ namespace VK_UI3.Views
                         // frameSection.Navigate(typeof(SectionView), section, new DrillInNavigationTransitionInfo());
                         // loadBlocks(res.Catalog.Sections[0].Blocks);
                     }
-                    frameSection.Navigate(typeof(SectionView), res.Catalog.Sections[0], new DrillInNavigationTransitionInfo());
+                    frameSection.Navigate(typeof(SectionView), res.Catalog.Sections[0], GetNavigationTransitionInfo());
                     return;
                 }
 

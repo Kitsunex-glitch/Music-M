@@ -18,7 +18,7 @@ namespace KrotosNavigationFrame
        public  SectionType sectionType;
     }
 
-    internal class NavigateFrame : Grid
+    public class NavigateFrame : Grid
     {
         private List<FramesKrotos> _BackStack = new List<FramesKrotos>();
 

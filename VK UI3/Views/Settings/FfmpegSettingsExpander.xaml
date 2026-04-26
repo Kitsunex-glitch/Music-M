@@ -26,7 +26,7 @@
     </Expander.Header>
 
     <Expander.Content>
-        <StackPanel Spacing="12">
+        <StackPanel Spacing="12" HorizontalAlignment="Stretch">
 
             <!--  Сообщение о загрузке  -->
             <ProgressRing
@@ -50,6 +50,8 @@
                     <DataTemplate x:DataType="local:CategorySettingsGroup">
                         <Expander
                             Margin="0,0,0,8"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Stretch"
                             Header="{x:Bind CategoryName}"
                             IsExpanded="True">
                             <ItemsControl ItemsSource="{x:Bind Settings}">
@@ -126,7 +128,7 @@
 
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
-                        <StackPanel Orientation="Vertical" Spacing="12" />
+                        <StackPanel Orientation="Vertical" Spacing="12" HorizontalAlignment="Stretch" />
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
             </ItemsControl>

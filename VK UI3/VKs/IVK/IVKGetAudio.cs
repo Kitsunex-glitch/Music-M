@@ -10,6 +10,7 @@ using VK_UI3.Controllers;
 using VK_UI3.Helpers;
 using VK_UI3.Services;
 using VkNet.Abstractions;
+using Windows.Media.Core;
 
 namespace VK_UI3.VKs.IVK
 {

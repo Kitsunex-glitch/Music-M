@@ -17,6 +17,7 @@ internal partial class SnowFlake
     private double _step;
     private double _angle;
     private TranslateTransform? _transform;
+    private Windows.UI.Color _color;
 
     /// <summary>
     /// Gets or sets shape of the snowflake
@@ -102,5 +103,12 @@ internal partial class SnowFlake
     {
         get => _transform;
         set => _transform = value;
+    }
+
+    /// <summary>Gets or sets snowflake color</summary>
+    public Windows.UI.Color Color
+    {
+        get => _color;
+        set => _color = value;
     }
 }

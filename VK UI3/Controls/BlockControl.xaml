@@ -96,6 +96,10 @@
             <blocks:Buttons />
         </DataTemplate>
 
+        <DataTemplate x:Key="action_large_slider">
+            <blocks:Buttons />
+        </DataTemplate>
+
 
         <DataTemplate x:Key="artist_videos">
             <blocks:ListVideo />
@@ -134,6 +138,20 @@
         <DataTemplate x:Key="curator_banner">
             <blocks:CuratorBannerBlockControl />
         </DataTemplate>
+        <DataTemplate x:Key="concerts_slider">
+            <blocks:ListConcerts />
+        </DataTemplate>
+        <DataTemplate x:Key="concerts_list">
+            <blocks:ListConcerts />
+        </DataTemplate>
+
+        <DataTemplate x:Key="market_items_artist_merch_slider">
+            <blocks:ListMerch />
+        </DataTemplate>
+        <DataTemplate x:Key="market_items_double_stacked_list">
+            <blocks:ListMerch />
+        </DataTemplate>
+
     </UserControl.Resources>
 
 

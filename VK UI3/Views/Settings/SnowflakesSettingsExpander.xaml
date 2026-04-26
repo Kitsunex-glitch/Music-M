@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Expander
+    x:Class="VK_UI3.Views.Settings.SnowflakesSettingsExpander"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="using:VK_UI3.Views.Settings"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    HorizontalAlignment="Stretch"
+    HorizontalContentAlignment="Stretch"
+    IsExpanded="False"
+    mc:Ignorable="d">
+
+    <Expander.Header>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+            <FontIcon
+                VerticalAlignment="Center"
+                FontSize="16"
+                Glyph="&#xE9CA;" />
+            <TextBlock
+                VerticalAlignment="Center"
+                FontWeight="SemiBold"
+                Text="Настройки снежинок" />
+        </StackPanel>
+    </Expander.Header>
+
+    <Expander.Content>
+        <StackPanel Spacing="12">
+            <!-- Включение снежинок -->
+            <local:SnowflakesSetting
+                AutomationProperties.HelpText="Включает или выключает анимацию снежинок в приложении"
+                AutomationProperties.Name="Включить снежинки" />
+
+            <!-- Количество снежинок -->
+            <StackPanel>
+                <TextBlock
+                    AutomationProperties.HelpText="Отображает количество снежинок в анимации"
+                    AutomationProperties.Name="Количество снежинок"
+                    Text="Количество снежинок" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <local:SnowflakesCountSetting
+                        x:Name="snowflakesCount"
+                        Grid.Column="0"
+                        AutomationProperties.HelpText="Регулирует количество снежинок в анимации"
+                        AutomationProperties.Name="Ползунок количества снежинок" />
+                    <TextBlock
+                        Grid.Column="1"
+                        Margin="10,0,0,0"
+                        VerticalAlignment="Center"
+                        AutomationProperties.HelpText="Текущее значение количества снежинок"
+                        AutomationProperties.Name="Значение количества снежинок"
+                        Text="{x:Bind snowflakesCount.Value, Mode=OneWay}" />
+                    <TextBlock
+                        Grid.Column="2"
+                        VerticalAlignment="Center"
+                        AutomationProperties.HelpText="Единицы измерения количества снежинок"
+                        AutomationProperties.Name="Единицы измерения снежинок"
+                        Text="шт" />
+                </Grid>
+            </StackPanel>
+
+            <!-- Режим радуги -->
+            <local:SnowflakesRainbowSetting
+                AutomationProperties.HelpText="Включает или выключает разноцветный режим снежинок. При включении снежинки будут окрашены в радужные цвета."
+                AutomationProperties.Name="Разноцветные снежинки" />
+
+            <!-- Выбор цвета -->
+            <StackPanel>
+                <TextBlock
+                    AutomationProperties.HelpText="Выберите цвет снежинок. Если включен режим радуги, этот цвет игнорируется."
+                    AutomationProperties.Name="Цвет снежинок"
+                    Text="Цвет снежинок" />
+                <local:SnowflakesColorSetting HorizontalAlignment="Left"
+                    AutomationProperties.HelpText="Выберите цвет снежинок. Если включен режим радуги, этот цвет игнорируется."
+                    AutomationProperties.Name="Палитра цвета снежинок" />
+            </StackPanel>
+        </StackPanel>
+    </Expander.Content>
+</Expander>

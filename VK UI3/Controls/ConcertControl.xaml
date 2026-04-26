@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="VK_UI3.Controls.ConcertControl"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:custom="using:VK_UI3.Helpers.Animations"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="using:VK_UI3.Controls"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+   
+    Margin="3,0,4,6"
+    CornerRadius="8"
+    PointerEntered="UserControl_PointerEntered"
+    PointerExited="UserControl_PointerExited"
+    PointerPressed="UserControl_PointerPressed"
+    PointerReleased="UserControl_PointerReleased"
+    Translation="0,0,8"
+    mc:Ignorable="d">
+
+    <UserControl.RenderTransform>
+        <ScaleTransform x:Name="scaleTransform" ScaleX="1" ScaleY="1" />
+    </UserControl.RenderTransform>
+    <UserControl.RenderTransformOrigin>
+        0.5,0.5
+    </UserControl.RenderTransformOrigin>
+
+    <UserControl.Shadow>
+        <ThemeShadow />
+    </UserControl.Shadow>
+    <Grid CornerRadius="8">
+        <Grid.Resources>
+            <!-- Анимация масштабирования при наведении -->
+            <Storyboard x:Name="ShowAnimation">
+                <DoubleAnimation
+                    Storyboard.TargetName="scaleTransform"
+                    Storyboard.TargetProperty="ScaleX"
+                    To="0.975"
+                    Duration="0:0:0.15">
+                    <DoubleAnimation.EasingFunction>
+                        <ExponentialEase EasingMode="EaseOut" />
+                    </DoubleAnimation.EasingFunction>
+                </DoubleAnimation>
+                <DoubleAnimation
+                    Storyboard.TargetName="scaleTransform"
+                    Storyboard.TargetProperty="ScaleY"
+                    To="0.975"
+                    Duration="0:0:0.15">
+                    <DoubleAnimation.EasingFunction>
+                        <ExponentialEase EasingMode="EaseOut" />
+                    </DoubleAnimation.EasingFunction>
+                </DoubleAnimation>
+            </Storyboard>
+
+            <Storyboard x:Name="HideAnimation">
+                <DoubleAnimation
+                    Storyboard.TargetName="scaleTransform"
+                    Storyboard.TargetProperty="ScaleX"
+                    To="1"
+                    Duration="0:0:0.15">
+                    <DoubleAnimation.EasingFunction>
+                        <ExponentialEase EasingMode="EaseIn" />
+                    </DoubleAnimation.EasingFunction>
+                </DoubleAnimation>
+                <DoubleAnimation
+                    Storyboard.TargetName="scaleTransform"
+                    Storyboard.TargetProperty="ScaleY"
+                    To="1"
+                    Duration="0:0:0.15">
+                    <DoubleAnimation.EasingFunction>
+                        <ExponentialEase EasingMode="EaseIn" />
+                    </DoubleAnimation.EasingFunction>
+                </DoubleAnimation>
+            </Storyboard>
+
+            <!-- Анимация нажатия -->
+            <Storyboard x:Name="PressAnimation">
+                <DoubleAnimation
+                    Storyboard.TargetName="scaleTransform"
+                    Storyboard.TargetProperty="ScaleX"
+                    To="0.95"
+                    Duration="0:0:0.1">
+                    <DoubleAnimation.EasingFunction>
+                        <ExponentialEase EasingMode="EaseOut" />
+                    </DoubleAnimation.EasingFunction>
+                </DoubleAnimation>
+                <DoubleAnimation
+                    Storyboard.TargetName="scaleTransform"
+                    Storyboard.TargetProperty="ScaleY"
+                    To="0.95"
+                    Duration="0:0:0.1">
+                    <DoubleAnimation.EasingFunction>
+                        <ExponentialEase EasingMode="EaseOut" />
+                    </DoubleAnimation.EasingFunction>
+                </DoubleAnimation>
+            </Storyboard>
+
+            <Storyboard x:Name="ReleaseAnimation">
+                <DoubleAnimation
+                    Storyboard.TargetName="scaleTransform"
+                    Storyboard.TargetProperty="ScaleX"
+                    To="0.975"
+                    Duration="0:0:0.1">
+                    <DoubleAnimation.EasingFunction>
+                        <ExponentialEase EasingMode="EaseOut" />
+                    </DoubleAnimation.EasingFunction>
+                </DoubleAnimation>
+                <DoubleAnimation
+                    Storyboard.TargetName="scaleTransform"
+                    Storyboard.TargetProperty="ScaleY"
+                    To="0.975"
+                    Duration="0:0:0.1">
+                    <DoubleAnimation.EasingFunction>
+                        <ExponentialEase EasingMode="EaseOut" />
+                    </DoubleAnimation.EasingFunction>
+                </DoubleAnimation>
+            </Storyboard>
+
+            <!-- Анимация появления оверлея -->
+            <Storyboard x:Name="ShowOverlayAnimation">
+                <DoubleAnimation
+                    Storyboard.TargetName="OverlayGrid"
+                    Storyboard.TargetProperty="Opacity"
+                    To="1"
+                    Duration="0:0:0.15">
+                    <DoubleAnimation.EasingFunction>
+                        <ExponentialEase EasingMode="EaseOut" />
+                    </DoubleAnimation.EasingFunction>
+                </DoubleAnimation>
+            </Storyboard>
+
+            <Storyboard x:Name="HideOverlayAnimation">
+                <DoubleAnimation
+                    Storyboard.TargetName="OverlayGrid"
+                    Storyboard.TargetProperty="Opacity"
+                    To="0"
+                    Duration="0:0:0.15">
+                    <DoubleAnimation.EasingFunction>
+                        <ExponentialEase EasingMode="EaseIn" />
+                    </DoubleAnimation.EasingFunction>
+                </DoubleAnimation>
+            </Storyboard>
+        </Grid.Resources>
+
+        <StackPanel Orientation="Horizontal"
+            Padding="10"
+            Background="{ThemeResource LayerOnAccentAcrylicFillColorDefaultBrush}"
+            CornerRadius="8">
+
+            <!-- Изображение концерта -->
+            <Grid
+                Width="100"
+                Height="100"
+                Background="{ThemeResource LayerOnAccentAcrylicFillColorDefaultBrush}"
+                CornerRadius="8">
+                <Image
+                    x:Name="ConcertImage"
+                    Stretch="UniformToFill"
+                    Source="{Binding ConcertData.Image[0].Url}"
+                     />
+                <TextBlock
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Center"
+                    x:Name="DateText"
+                    TextAlignment="Center"
+                    FontFamily="{StaticResource VKSansRegular}"
+                    FontSize="30"
+                    TextTrimming="CharacterEllipsis"
+                    TextWrapping="Wrap" />
+                <Grid
+                    x:Name="OverlayGrid"
+                    Background="#80000000"
+                    CornerRadius="8"
+                    Opacity="0">
+                    <Button
+                        x:Name="ActionButton"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Click="ActionButton_Click"
+                        Content="{Binding PurchaseAction.Title, FallbackValue='Купить'}"
+                        Style="{StaticResource AccentButtonStyle}" />
+                </Grid>
+            </Grid>
+
+            <!-- Информация о концерте -->
+            <StackPanel
+                HorizontalAlignment="Left"
+                Background="Transparent"
+                CornerRadius="0"
+                Orientation="Vertical"
+                Margin="10">
+                <TextBlock
+                    x:Name="TitleText"
+                    MaxHeight="20"
+                    FontFamily="{StaticResource VKSansMedium}"
+                    FontSize="20"
+                    TextTrimming="CharacterEllipsis"
+                    TextWrapping="Wrap"
+                    Text="{Binding ConcertData.Title}" />
+                <TextBlock
+                    x:Name="PlaceText"
+                    MaxHeight="40"
+                    FontFamily="{StaticResource VKSansRegular}"
+                    FontSize="16"
+                    Opacity="0.6"
+                    TextTrimming="CharacterEllipsis"
+                    TextWrapping="Wrap"
+                    Text="{Binding ConcertData.PlaceTitle}" />
+                <TextBlock
+                    x:Name="CityDateText"
+                    MaxHeight="40"
+                    FontFamily="{StaticResource VKSansRegular}"
+                    FontSize="19"
+                    Opacity="0.6"
+                    TextTrimming="CharacterEllipsis"
+                    TextWrapping="Wrap" />
+                <TextBlock
+                    x:Name="PriceText"
+                    MaxHeight="40"
+                    FontFamily="{StaticResource VKSansRegular}"
+                    FontSize="20"
+                    Opacity="0.6"
+                    TextTrimming="CharacterEllipsis"
+                    TextWrapping="Wrap" />
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</UserControl>

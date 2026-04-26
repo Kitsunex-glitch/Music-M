@@ -4,17 +4,12 @@ using VkNet.Model;
 
 namespace MusicX.Core.Models.General
 {
-    public class ResponseVk
-    {
-        [JsonProperty("response")]
-        public ResponseData Response { get; set; }
-
-        [JsonProperty("error")]
-        public ErrorVk Error { get; set; }
-    }
-
     public class ResponseData
     {
+
+        [JsonProperty("market_items")]
+        public List<MarketItem> MarketItems { get; set; } = new List<MarketItem>();
+
         [JsonProperty("section")]
         public Section Section { get; set; }
 
@@ -89,15 +84,10 @@ namespace MusicX.Core.Models.General
 
         [JsonProperty("audio_followings_update_info")]
         public List<AudioFollowingsUpdateInfo> FollowingsUpdateInfos { get; set; }
+
+        [JsonProperty("concerts")]
+        public List<Concert> Concerts { get; set; }
+
+  
     }
-
-    public class ResposeVk<T>
-    {
-        [JsonProperty("response")]
-        public T Response { get; set; }
-
-        [JsonProperty("error")]
-        public ErrorVk Error { get; set; }
-    }
-
 }
