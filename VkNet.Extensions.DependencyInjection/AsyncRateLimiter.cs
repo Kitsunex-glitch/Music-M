@@ -45,27 +45,24 @@ public class AsyncRateLimiter : IAsyncRateLimiter
         }
     }
 
-    // ⚡ Максимально быстрый асинхронный метод
     public async ValueTask WaitNextAsync(CancellationToken cancellationToken = default)
     {
-        // Быстрая проверка без блокировки
-        if (TryGetNext())
-            return;
-
-        // Медленный путь - ждем
+        // Используем семафор для всей логики
         await _semaphore.WaitAsync(cancellationToken);
-
         try
         {
             while (true)
             {
+                var now = DateTime.UtcNow;
                 lock (_lock)
                 {
-                    var now = DateTime.UtcNow;
-
+                    // Правильный сброс окна
                     if (now - _windowStart >= _window)
                     {
-                        _windowStart = now;
+                        var excess = now - (_windowStart + _window);
+                        _windowStart = excess > TimeSpan.Zero
+                            ? now
+                            : _windowStart + _window;
                         _requestsInWindow = 0;
                     }
 
@@ -76,8 +73,9 @@ public class AsyncRateLimiter : IAsyncRateLimiter
                     }
                 }
 
-                // Ждем минимально возможное время
-                await Task.Delay(10, cancellationToken); // ⚡ всего 10мс вместо полного окна
+                // Рассчитываем точное время ожидания
+                var waitTime = _windowStart + _window - now;
+                await Task.Delay(waitTime > TimeSpan.Zero ? waitTime : TimeSpan.FromMilliseconds(1), cancellationToken);
             }
         }
         finally

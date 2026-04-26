@@ -26,7 +26,7 @@ public static class ServiceCollectionExtensions
 
         collection.TryAddTransient<IVkApiAuth>(s => s.GetRequiredService<IVkApiAuthAsync>());
         collection.TryAddTransient<IVkInvoke>(s => s.GetRequiredService<IVkApi>());
-        collection.TryAddSingleton<IAsyncRateLimiter>(_ => new AsyncRateLimiter(TimeSpan.FromSeconds(1), 3));
+        collection.TryAddSingleton<IAsyncRateLimiter>(_ => new AsyncRateLimiter(TimeSpan.FromSeconds(1), 10));
         
         collection.RegisterDefaultDependencies();
         
