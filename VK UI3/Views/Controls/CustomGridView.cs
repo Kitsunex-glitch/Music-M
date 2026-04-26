@@ -16,7 +16,7 @@ namespace VK_UI3.Views.Controls
 {
     internal class CustomGridView : GridView
     {
-
+        bool loaded = false;
         public CustomGridView()
         {
             this.Loaded += CustomGridView_Loaded;
@@ -40,6 +40,7 @@ namespace VK_UI3.Views.Controls
             scrollViewer = FindScrollViewer(this);
             if (scrollViewer != null)
                 scrollViewer.ViewChanged += ScrollViewer_ViewChanged;
+            this.loaded = true;
         }
 
 
@@ -159,28 +160,36 @@ namespace VK_UI3.Views.Controls
 
         }
 
-  
+
         public bool CheckIfAllContentIsVisible()
         {
-            if (scrollViewer == null || 
-                disableLoadMode) return false;
+            if (scrollViewer == null || disableLoadMode)
+                return false;
+
+            bool allContentVisible = false;
 
             if (scrollViewer.HorizontalScrollMode == ScrollMode.Enabled)
             {
-             
-                if (scrollViewer.ViewportWidth > scrollViewer.ExtentWidth-50)
-                {
-                    return true;
-                }
+                // Контент полностью видим, если ширина viewport'а больше или равна общей ширине контента
+                // Добавляем небольшой запас (2 пикселя) для учета погрешностей округления
+                allContentVisible = scrollViewer.ViewportWidth >= scrollViewer.ExtentWidth - 2;
             }
+
             if (scrollViewer.VerticalScrollMode == ScrollMode.Enabled)
             {
-                if (scrollViewer.ViewportHeight > scrollViewer.ExtentHeight - 50)
+                // Если проверяем оба направления, контент видим только если оба условия выполняются
+                if (scrollViewer.HorizontalScrollMode == ScrollMode.Enabled)
                 {
-                    return true;
+                    allContentVisible = allContentVisible &&
+                        (scrollViewer.ViewportHeight >= scrollViewer.ExtentHeight - 2);
+                }
+                else
+                {
+                    allContentVisible = scrollViewer.ViewportHeight >= scrollViewer.ExtentHeight - 2;
                 }
             }
-            return false;
+
+            return allContentVisible;
         }
 
         public EventHandler loadMore;
