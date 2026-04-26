@@ -21,6 +21,7 @@ namespace VK_UI3.SnowFlake
         private readonly List<SnowFlake> _snowFlakes = [];
         private double mX = -100;
         private double mY = -100;
+        private bool _isRunning = false;
 
         public bool AutoStart
         {
@@ -43,10 +44,9 @@ namespace VK_UI3.SnowFlake
         private static void OnFlakeCountChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             var ctl = (SnowFlakeEffect)d;
-            if (ctl != null)
+            if (ctl != null && ctl._isRunning)
             {
-                ctl.Stop();
-                ctl.Start();
+                ctl.UpdateFlakeCount((int)e.NewValue);
             }
         }
 
@@ -73,10 +73,9 @@ namespace VK_UI3.SnowFlake
         private static void OnColorPropertyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             var ctl = (SnowFlakeEffect)d;
-            if (ctl != null)
+            if (ctl != null && ctl._isRunning)
             {
-                ctl.Stop();
-                ctl.Start();
+                ctl.UpdateFlakeColors();
             }
         }
 
@@ -135,7 +134,10 @@ namespace VK_UI3.SnowFlake
 
         public void Start()
         {
+            if (_isRunning) return;
+
             InitSnowFlakes();
+            _isRunning = true;
         }
 
         public void Stop()
@@ -144,8 +146,53 @@ namespace VK_UI3.SnowFlake
                 return;
 
             ClearSnowFlakes();
-
             _canvas.Children.Clear();
+            _isRunning = false;
+        }
+
+        private void UpdateFlakeCount(int newCount)
+        {
+            if (_canvas == null) return;
+
+            int currentCount = _snowFlakes.Count;
+
+            if (newCount > currentCount)
+            {
+                // Добавляем недостающие снежинки
+                for (int i = currentCount; i < newCount; i++)
+                {
+                    CreateSnowFlake();
+                }
+            }
+            else if (newCount < currentCount)
+            {
+                // Удаляем лишние снежинки
+                for (int i = currentCount - 1; i >= newCount; i--)
+                {
+                    var flake = _snowFlakes[i];
+                    _canvas.Children.Remove(flake.Shape);
+                    _snowFlakes.RemoveAt(i);
+                }
+            }
+        }
+
+        private void UpdateFlakeColors()
+        {
+            foreach (var flake in _snowFlakes)
+            {
+                flake.Color = GetFlakeColor();
+                if (flake.Shape != null)
+                {
+                    flake.Shape.SetValue(
+                        Shape.FillProperty,
+                        new SolidColorBrush(Color.FromArgb(
+                            (byte)(flake.Opacity * 255),
+                            flake.Color.R,
+                            flake.Color.G,
+                            flake.Color.B))
+                    );
+                }
+            }
         }
 
         private void InitSnowFlakes()

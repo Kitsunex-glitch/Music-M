@@ -557,10 +557,10 @@ namespace VK_UI3
 
             if (enabledSnowSetting.settingValue == "1")
             {
-                snow.Start();
                 SetFlakeCount();
                 SetRainbowMode();
                 SetFlakeColor();
+                snow.Start();
             }
             else
             {
@@ -581,10 +581,10 @@ namespace VK_UI3
 
             if (isWinter)
             {
-                snow.Start();
                 SetFlakeCount();
                 SetRainbowMode();
                 SetFlakeColor();
+                snow.Start();
             }
         }
 
