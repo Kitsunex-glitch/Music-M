@@ -1,13 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using JetBrains.Annotations;
+﻿using JetBrains.Annotations;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Serialization;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using VkNet.Abstractions;
 using VkNet.Abstractions.Core;
 using VkNet.Abstractions.Utils;
@@ -130,50 +131,41 @@ public class VkApiInvoke : IVkApiInvoke
     private async Task<JToken> InvokeInternalAsync(string methodName, IDictionary<string, string> parameters, bool skipAuthorization)
     {
         await TryAddRequiredParameters(parameters, skipAuthorization);
-        
+
         return await _handler.Perform(async (sid, key) =>
         {
             if (sid is { } captchaSid)
             {
-                if (parameters.ContainsKey("captcha_sid"))
-                {
-                    parameters["captcha_sid"] = sid.ToString();
-                    
-                }
-                else
-                {
-                    parameters.Add("captcha_sid", sid.ToString());
-                }
-                if (parameters.ContainsKey("captcha_key"))
-                {
-                    parameters.Remove("captcha_key");
-                }
-                if (parameters.ContainsKey("success_token"))
-                {
-                    parameters.Add("success_token", key);
-                }
-                else
-                {
-                    parameters["success_token"] = key;
-                }
-
+                parameters["captcha_sid"] = captchaSid.ToString();
+                parameters["captcha_key"] = key;
                 parameters["confirm"] = "1";
+                parameters.Remove("success_token");
             }
 
             await _rateLimiter.WaitNextAsync();
 
-            var response = await _client.PostAsync(new(_apiBaseUri, methodName), parameters, Encoding.UTF8);
+            // Таймаут через Task.WhenAny (без изменения IRestClient)
+            var requestTask = _client.PostAsync(new(_apiBaseUri, methodName), parameters, Encoding.UTF8);
+            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(5));
+
+            var completedTask = await Task.WhenAny(requestTask, timeoutTask);
+            if (completedTask == timeoutTask)
+            {
+                throw new TimeoutException($"VK API method '{methodName}' timed out after 5 seconds");
+            }
+
+            var response = await requestTask;
             LastInvokeTime = DateTimeOffset.Now;
 
             try
             {
                 return VkErrors.IfErrorThrowException(response.Value)["response"]!;
             }
-            catch (VkApiMethodInvokeException e) when (e.ErrorCode is 5 or 1117 or 1114) // token has expired
+            catch (VkApiMethodInvokeException e) when (e.ErrorCode is 5 or 1117 or 1114)
             {
                 if (await _tokenRefreshHandler.RefreshTokenAsync(_tokenStore.Token) is not { } newToken)
                     throw;
-                
+
                 parameters["access_token"] = newToken;
                 return await InvokeInternalAsync(methodName, parameters, skipAuthorization);
             }
