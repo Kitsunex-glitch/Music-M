@@ -11,8 +11,35 @@ namespace VK_UI3
     public class MusicMStatDefaultGate : StatDefaultGateLib.StatDefaultGate
     {
         public  static string Token { get; set; } = StaticParams.tokenStatDefaultGate;
-        public MusicMStatDefaultGate() : base(Token) 
+        public MusicMStatDefaultGate() : base(Token)
         {
+        }
+
+        /// <summary>
+        /// Синхронизирует флаг IsEnabled с настройкой из БД.
+        /// Вызывается при старте приложения и при изменении настройки.
+        /// </summary>
+        public static void SyncEnabledFromSettings()
+        {
+            try
+            {
+                var setting = DB.SettingsTable.GetSetting("StatDefaultGateEnabled");
+                if (setting == null)
+                {
+                    // По умолчанию статистика включена (opt-out)
+                    IsEnabled = true;
+                    DB.SettingsTable.SetSetting("StatDefaultGateEnabled", "1");
+                }
+                else
+                {
+                    IsEnabled = setting.settingValue.Equals("1");
+                }
+            }
+            catch
+            {
+                // При ошибке чтения — оставляем включённым
+                IsEnabled = true;
+            }
         }
     }
 }

@@ -13,12 +13,21 @@ namespace StatDefaultGateLib
         public static Uri StatDefaultGateUri { get; } = new Uri("https://StatDefaultGate.ru/open_api/");
         public string Token { get; set; }
 
+        /// <summary>
+        /// Флаг, указывающий, включена ли отправка статистики.
+        /// По умолчанию true. Устанавливается из настроек приложения.
+        /// </summary>
+        public static bool IsEnabled { get; set; } = true;
+
         public void SetToken(string token) {
             Token = token;
         }
 
         public async Task SendEvent(Event @event) {
 
+            // Если сбор статистики отключён — не отправляем
+            if (!IsEnabled)
+                return;
 
             try
             {
@@ -36,7 +45,7 @@ namespace StatDefaultGateLib
 
             }
             catch (Exception e)
-            { 
+            {
             
             
             }
