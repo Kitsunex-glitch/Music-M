@@ -245,8 +245,6 @@ namespace VK_UI3
         {
             try
             {
-             
-
                 var setting = DB.SettingsTable.GetSetting("UserUniqID");
                 string UserUniqID;
                 var assemblyVersion = Assembly.GetExecutingAssembly().GetName().Version;
@@ -274,9 +272,6 @@ namespace VK_UI3
                 }
 
                 {
-                 
-               
-
                     var listParams = new List<EventParams>
                     {
                         new EventParams("userID", UserUniqID),
@@ -295,9 +290,7 @@ namespace VK_UI3
                     Event @event = new Event("Run App", DateTime.Now, eventParams: listParams);
                     _ = new MusicMStatDefaultGate().SendEvent(@event);
 
-
                     setting = DB.SettingsTable.GetSetting("FirstRunDate");
-                 
 
                     DateOnly nowDate = DateOnly.FromDateTime(DateTime.Now);
 
@@ -314,15 +307,14 @@ namespace VK_UI3
                         await (new MusicMStatDefaultGate().SendEvent(@event));
                         DB.SettingsTable.SetSetting("FirstRunDate", nowDate.ToString());
                     }
-                    catch 
+                    catch
                     {
 
                     }
-
                 }
             }
             catch (Exception e)
-            { 
+            {
             }
         }
 
@@ -404,47 +396,37 @@ namespace VK_UI3
                 // Получаем детальную информацию о месте ошибки
                 var stackTrace = new StackTrace(exception, true);
                 var frames = stackTrace.GetFrames();
-         
+
                 int lineNumber = 0;
                 int columnNumber = 0;
 
                 if (frames != null && frames.Length > 0)
                 {
                     var firstFrame = frames[0];
-                    var method = firstFrame.GetMethod();
-                    
                     lineNumber = firstFrame.GetFileLineNumber();
                     columnNumber = firstFrame.GetFileColumnNumber();
                 }
 
                 var listParams = new List<EventParams>
                 {
-                    // Основная информация
                     new EventParams("userID", UserUniqID),
                     new EventParams("versionAPP", version),
                     new EventParams("sender", sender?.GetType().FullName ?? "null"),
-            
-                    // Информация об исключении
+
                     new EventParams("exception_type", exception.GetType().FullName),
                     new EventParams("exception_message", exception.Message ?? "null"),
                     new EventParams("exception_source", exception.Source ?? "null"),
                     new EventParams("exception_hresult", $"0x{exception.HResult:X8}"),
                     new EventParams("exception_targetsite", exception.TargetSite?.ToString() ?? "null"),
-            
+
                     new EventParams("report", report),
                     new EventParams("error_line", lineNumber.ToString()),
                     new EventParams("error_column", columnNumber.ToString()),
-            
-                    // Полный стек
+
                     new EventParams("stack_trace", exception.StackTrace ?? "null"),
-            
-                    // Вложенное исключение (если есть)
+
                     new EventParams("has_inner_exception", (exception.InnerException != null).ToString()),
                 };
-
-      
-
-                
 
                 Event @event = new Event("Exception", DateTime.Now, eventParams: listParams);
 

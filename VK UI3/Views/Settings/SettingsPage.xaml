@@ -348,15 +348,15 @@
                         HorizontalAlignment="Stretch"
                         VerticalAlignment="Stretch"
                         Spacing="8">
-                        <Border>
+                        <Border Visibility="Collapsed">
                             <local:StatDefaultGateToggleSetting AutomationProperties.HelpText="Включает или выключает отправку анонимной статистики использования и отчётов об ошибках на сервер StatDefaultGate" AutomationProperties.Name="Отправлять анонимную статистику использования" />
                         </Border>
-                        <Border>
+                        <Border Visibility="Collapsed">
                             <Button
                                 x:Name="PrivacyPolicyButton"
                                 HorizontalAlignment="Stretch"
                                 HorizontalContentAlignment="Left"
-                                Click="PrivacyPolicyButton_Click"
+                   
                                 AutomationProperties.HelpText="Открывает политику конфиденциальности приложения"
                                 AutomationProperties.Name="Политика конфиденциальности">
                                 <StackPanel Orientation="Horizontal" Spacing="8">

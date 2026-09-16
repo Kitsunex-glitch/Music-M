@@ -11,7 +11,7 @@ namespace VK_UI3.Views.Notification
     public enum ButtonActionType
     {
         Url,        // Открыть URL
-        Event,      // Отправить событие (StatDefaultGate)
+        Event,      // Отправить событие
         Close       // Закрыть уведомление
     }
 
