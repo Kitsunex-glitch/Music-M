@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace VK_UI3.Helpers
 {
     /// <summary>
-    /// Модель статуса стримера, возвращаемая endpoint'ом https://twitch-scope-production.up.railway.app/status
+    /// Модель статуса стримера, возвращаемая endpoint'ом https://little-hill-8dc9.fairdarkworker.workers.dev/
     /// (формат Twitch API Helix /streams).
     /// </summary>
     public class TwitchStreamStatus
@@ -53,7 +53,7 @@ namespace VK_UI3.Helpers
     /// </summary>
     internal class TwitchStatusService : IDisposable
     {
-        private const string StatusUrl = "https://twitch-scope-production.up.railway.app/status";
+        private const string StatusUrl = "https://little-hill-8dc9.fairdarkworker.workers.dev/";
         private readonly HttpClient _client;
 
         public TwitchStatusService()
