@@ -49,6 +49,7 @@ namespace VK_UI3.DB
                     _db.CreateTable<SettingsTable>();
                     _db.CreateTable<SkipPerfmormer>();
                     _db.CreateTable<SurveyResponse>();
+                    _db.CreateTable<TwitchNotifHistory>();
 
                 }
                 catch (SQLiteException ex)
@@ -63,6 +64,7 @@ namespace VK_UI3.DB
                         _db.CreateTable<SettingsTable>();
                         _db.CreateTable<SkipPerfmormer>();
                         _db.CreateTable<SurveyResponse>();
+                        _db.CreateTable<TwitchNotifHistory>();
                     }
                     else
                     {

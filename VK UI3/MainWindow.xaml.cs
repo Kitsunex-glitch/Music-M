@@ -61,6 +61,7 @@ namespace VK_UI3
         private IntPtr oldWndProc = IntPtr.Zero;
         private bool addClosed = false;
         public bool justClose = false;
+        private Microsoft.UI.Xaml.DispatcherTimer _twitchCheckTimer;
         #endregion
 
         #region Constants
@@ -442,6 +443,7 @@ namespace VK_UI3
             checkUpdate();
 #endif
             checkNotifications();
+            InitializeTwitchChecking();
             InitializeSnow();
 
             // Инициализация конфетти
@@ -584,6 +586,91 @@ namespace VK_UI3
             );
         }
 
+        #region Twitch Live Status
+        /// <summary>
+        /// Запускает немедленную проверку статуса стримеров и настраивает периодический опрос раз в час.
+        /// </summary>
+        private void InitializeTwitchChecking()
+        {
+            // Немедленный запрос при запуске приложения
+            _ = checkTwitchStatusAsync();
+
+            // Периодический опрос раз в час
+            if (_twitchCheckTimer == null)
+            {
+                _twitchCheckTimer = new Microsoft.UI.Xaml.DispatcherTimer();
+                _twitchCheckTimer.Interval = TimeSpan.FromHours(1);
+                _twitchCheckTimer.Tick += async (s, e) => await checkTwitchStatusAsync();
+                _twitchCheckTimer.Start();
+            }
+        }
+
+        /// <summary>
+        /// Проверяет статус всех стримеров и создаёт уведомление для каждого живого,
+        /// по которому сегодня ещё не было уведомления.
+        /// </summary>
+        private async Task checkTwitchStatusAsync()
+        {
+            try
+            {
+                using var service = new Helpers.TwitchStatusService();
+                var statuses = await service.GetStatusesAsync();
+                if (statuses == null)
+                    return;
+
+                string today = DateTime.Now.ToString("yyyy-MM-dd");
+
+                foreach (var status in statuses)
+                {
+                    try
+                    {
+
+                        // Логин стримера (используется для уникального ключа и ссылки на стрим)
+                        string login = status.Login;
+                        if (string.IsNullOrWhiteSpace(login))
+                            continue;
+
+                        // Пропускаем, если сегодня по этому стримеру уведомление уже создавалось
+                        if (DB.TwitchNotifManager.HasBeenNotified(login, today))
+                            continue;
+
+                        // Отмечаем, что по стримеру уже было уведомление сегодня
+                        DB.TwitchNotifManager.MarkAsNotified(login, today);
+
+                        CreateTwitchLiveNotification(status);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Ошибка обработки стримера {status.Login ?? status.user}: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Ошибка проверки статусов Twitch: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Создаёт отдельное уведомление о том, что стример сейчас в эфире.
+        /// </summary>
+        private static void CreateTwitchLiveNotification(Helpers.TwitchStreamStatus status)
+        {
+            string displayName = status.DisplayName;
+            string header = $"🔴 {displayName} сейчас в эфире";
+
+            // Отдельный кастомный UI для уведомления о стриме
+            var twitchControl = new Views.Notification.TwitchNotifController();
+            twitchControl.SetStream(status);
+
+            var notification = new Notification(
+                twitchControl,
+                header,
+                $"Стример {displayName} сейчас в эфире!"
+            );
+            notification.Type = NotificationType.Standard;
+        }
+        #endregion
 
         #region Snow
         private void InitializeSnow()
