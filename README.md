@@ -39,19 +39,19 @@ Music M - По сути своей адаптация VK X и Music X, пере�
 [ARM64 - урезанная версия установщика](https://github.com/Kitsunex-glitch/Music-M/releases/download/0.3.9.5/Setup-SLIM.ARM64.exe) - подойдёт владельцам процессора ARM64, придётся ручками ставить библиотеку .NET
 
 ## Скриншоты
-![image](https://github.com/user-attachments/assets/6525ad2f-18c8-48c4-8605-ad68c118702a)
-![image](https://github.com/user-attachments/assets/89689566-7940-4dae-861f-4eae2fb8afd5)
-<img  alt="image" src="https://github.com/user-attachments/assets/01517d19-ac6f-4add-a939-867486a76d50" />
-![image](https://github.com/user-attachments/assets/ca2eae3c-443e-464d-a04e-eace7d4cba2b)
-![image](https://github.com/user-attachments/assets/db59c45b-9101-44aa-bfac-df29ec0d88f4)
-![image](https://github.com/user-attachments/assets/3a230857-c03a-4c80-828c-9710b6bde6ae)
+<img width="1813" height="1053" alt="image" src="https://github.com/user-attachments/assets/8436fd0e-b14b-4fb0-82ab-ea521cd55640" />
+<img width="1827" height="1055" alt="image" src="https://github.com/user-attachments/assets/70088bc1-6f24-4803-a0be-d3c58ba5bfe9" />
+<img width="2205" height="1129" alt="image" src="https://github.com/user-attachments/assets/224054ca-bb38-40c9-b191-ce1e8ba1f7a7" />
+<img width="1841" height="1083" alt="image" src="https://github.com/user-attachments/assets/d1154856-8c8a-4a5b-8dc5-378a7ff38301" />
+<img width="1789" height="1079" alt="image" src="https://github.com/user-attachments/assets/301c229f-87f9-48eb-9aa7-cc4ac923f4a8" />
+<img width="2062" height="1079" alt="image" src="https://github.com/user-attachments/assets/ec90db56-b443-425a-8cdf-0160fd35df38" />
+<img width="2252" height="1124" alt="image" src="https://github.com/user-attachments/assets/982aa0a8-11da-4195-8652-5fdd801afda4" />
+<img width="2238" height="1107" alt="image" src="https://github.com/user-attachments/assets/0e3d06e8-4a1d-480f-9985-95456cefd981" />
+<img width="2220" height="1112" alt="image" src="https://github.com/user-attachments/assets/e340d0a8-ceb0-465e-9f59-c91c846e7108" />
+<img width="2205" height="1109" alt="image" src="https://github.com/user-attachments/assets/cfa207cd-e77d-4c57-ab3f-bb98616409f3" />
+<img width="2200" height="1120" alt="image" src="https://github.com/user-attachments/assets/0b59b2fd-ec65-40f7-b65d-1ee7113bd153" />
+<img width="2218" height="1135" alt="image" src="https://github.com/user-attachments/assets/7e8e3bc4-69dc-4a03-a759-f85fea4e0a06" />
 
-![image](https://github.com/user-attachments/assets/af681632-263c-438d-a138-e91975220fd3)
-![image](https://github.com/user-attachments/assets/3766499d-052d-435c-a673-808e8bfbc315)
-![image](https://github.com/user-attachments/assets/228499f9-a7d7-492a-ace6-5329b02e1bdb)
-![image](https://github.com/user-attachments/assets/7fb9122a-88ed-4042-96ae-288949a884b0)
-![image](https://github.com/user-attachments/assets/e98cbf79-a4a6-434c-b382-089c9abe7ffd)
-![image](https://github.com/user-attachments/assets/b859710a-fc2c-4ac0-865f-90d2cbe36816)
 
 ## Star History
 
