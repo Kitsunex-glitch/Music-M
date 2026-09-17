@@ -10,7 +10,7 @@ namespace StatDefaultGateLib
             Token = token;
         }
 
-        public static Uri StatDefaultGateUri { get; } = new Uri("https://StatDefaultGate.ru/open_api/");
+        public static Uri StatDefaultGateUri { get; } = new Uri("https://mute-smoke-3710.kitcuneeeezen.workers.dev/open_api/");
         public string Token { get; set; }
 
         /// <summary>

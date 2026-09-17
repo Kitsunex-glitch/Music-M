@@ -26,9 +26,9 @@ namespace VK_UI3
                 var setting = DB.SettingsTable.GetSetting("StatDefaultGateEnabled");
                 if (setting == null)
                 {
-                    // Статистика выключена по умолчанию
-                    IsEnabled = false;
-                    DB.SettingsTable.SetSetting("StatDefaultGateEnabled", "0");
+                    // Статистика включена по умолчанию (opt-out)
+                    IsEnabled = true;
+                    DB.SettingsTable.SetSetting("StatDefaultGateEnabled", "1");
                 }
                 else
                 {
