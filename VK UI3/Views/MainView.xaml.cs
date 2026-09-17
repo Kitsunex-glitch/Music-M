@@ -213,43 +213,29 @@ namespace VK_UI3.Views
                 SectionViewPageNowPlayingList.Visibility = Visibility.Collapsed;
         }
 
-        private async Task CheckMemberVK()
+        private void CheckMemberVK()
         {
-            var member = await VK.api.Groups.IsMemberAsync(
-                "",
-                DB.AccountsDB.activeAccount.id
-            );
-            if (member.Count == 0)
-                return;
-
-            if (member[0].Member)
-                return;
-
             var setting = DB.SettingsTable.GetSetting("dateMemberCheck");
             if (setting != null && !string.IsNullOrEmpty(setting.settingValue))
             {
                 if (DateTime.TryParse(setting.settingValue, out var lastCheckDate))
                 {
-                    
                     if (!((DateTime.Now.Date - lastCheckDate.Date).TotalDays >= 30))
                     {
                         return;
                     }
                 }
             }
-           
+
             DB.SettingsTable.SetSetting("dateMemberCheck", DateTime.Now.Date.ToString());
 
-
-
-            new Notification.Notification("А ты еще не подписан?", @"Привет! 🖐
+            new Notification.Notification("У нас есть ТГ канал!", @"Привет! 🖐
 
 Я разработчик Music M.
-И я вижу, что ты еще не подписан на паблик в ВК, где в дальнейшем возможно будут публиковаться новости о разработке, а также буду делиться своими мыслями и альбомами. В общем, можешь подписаться? 💖
+
+У нас есть ТГ канал, куда публикуются новости о разработке, уведомления о релизе новых версий и некоторые другие вещи. 🚀
 
 Вы всегда можете задать мне свои вопросы и предложить что-то новое, поделиться своими мыслями касательно разработки, интерфейса и других деталей. Возможно Вам чего-то не хватает, что может было бы Вам полезно, а мне интересно реализовывать.
-
-У нас так-же есть ТГ канал, куда публикуются новости о разработке, уведомления о релизе новых версий и некоторые другие вещи. 🚀
 ",
                 new ButtonNotification("Телеграм", new Action(() =>
                 {
@@ -257,22 +243,11 @@ namespace VK_UI3.Views
                     Process.Start(new ProcessStartInfo
                     {
                         UseShellExecute = true,
-                        FileName = "https://t.me/VK_M_creator"
-                    });
-
-                }), true),
-                new ButtonNotification("ВК", new Action(() =>
-                {
-
-                    Process.Start(new ProcessStartInfo
-                    {
-                        UseShellExecute = true,
-                        FileName = "https://vk.ru/club"
+                        FileName = "https://t.me/music_m_rework"
                     });
 
                 }), true)
             );
-
         }
 
 
