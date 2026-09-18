@@ -114,11 +114,11 @@ namespace VK_UI3.DownloadTrack
                 switch (RuntimeInformation.OSArchitecture)
                 {
                     case Architecture.X86:
-                        return "https://github.com/Kitsunex-glitch/Music-M/releases/download/0.3.2.5/ffmpeg-X32.zip";
+                        return "https://github.com/Kitsunex-glitch/Music-M/releases/download/0.3.9.5/ffmpeg-X32.zip";
                     case Architecture.X64:
-                        return "https://github.com/Kitsunex-glitch/Music-M/releases/download/0.3.2.5/ffmpeg-X64.zip";
+                        return "https://github.com/Kitsunex-glitch/Music-M/releases/download/0.3.9.5/ffmpeg-X64.zip";
                     case Architecture.Arm64:
-                        return "https://github.com/Kitsunex-glitch/Music-M/releases/download/0.3.2.5/ffmpeg-ARM64.zip";
+                        return "https://github.com/Kitsunex-glitch/Music-M/releases/download/0.3.9.5/ffmpeg-ARM64.zip";
 
                     default:
                         return null;
