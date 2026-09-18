@@ -136,7 +136,7 @@ namespace Setup
         {
             var psi = new System.Diagnostics.ProcessStartInfo
             {
-                FileName = "https://t.me/ё",
+                FileName = "https://t.me/music_m_rework",
                 UseShellExecute = true
             };
             System.Diagnostics.Process.Start(psi);
