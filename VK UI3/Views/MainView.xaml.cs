@@ -108,10 +108,6 @@ namespace VK_UI3.Views
 
 
             this.Unloaded -= MainView_Unloaded;
-
-
-
-            _ = CheckMemberVK();
         }
 
         private void MainView_KeyDown(object sender, KeyRoutedEventArgs e)
@@ -203,7 +199,7 @@ namespace VK_UI3.Views
 
             MainWindow.mainWindow.MainWindow_showRefresh();
 
-            _ = CheckMemberVK();
+            CheckMemberVK();
 
         }
 
