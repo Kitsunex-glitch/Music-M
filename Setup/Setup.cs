@@ -136,7 +136,7 @@ namespace Setup
         {
             var psi = new System.Diagnostics.ProcessStartInfo
             {
-                FileName = "https://t.me/VK_M_creator",
+                FileName = "https://t.me/ё",
                 UseShellExecute = true
             };
             System.Diagnostics.Process.Start(psi);

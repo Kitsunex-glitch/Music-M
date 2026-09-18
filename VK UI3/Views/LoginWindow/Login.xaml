@@ -101,7 +101,7 @@
                     Click="BackButton"
                     Content="Отмена" />
                 <TextBlock Margin="0,20,0,0" TextAlignment="Center">
-                    <Hyperlink NavigateUri="https://t.me/VK_M_creator">Music M в telegram</Hyperlink>
+                    <Hyperlink NavigateUri="https://t.me/music_m_rework">Music M в telegram</Hyperlink>
                 </TextBlock>
 
             </StackPanel>

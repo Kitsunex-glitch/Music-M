@@ -378,7 +378,7 @@
                 AutomationProperties.HelpText="Ссылка на Telegram канал разработчика"
                 AutomationProperties.Name="Ссылка на Telegram"
                 TextAlignment="Center">
-                <Hyperlink NavigateUri="https://t.me/VK_M_creator">Music M в telegram</Hyperlink>
+                <Hyperlink NavigateUri="https://t.me/music_m_rework">Music M в telegram</Hyperlink>
             </TextBlock>
 
         </StackPanel>

@@ -135,7 +135,7 @@ namespace VK_UI3.DiscordRPC
                             new Button()
                             {
                                 Label = "ТГ Канал",
-                                Url = "https://t.me/VK_M_creator"
+                                Url = "https://t.me/music_m_rework"
                             }
                         }
                     };
