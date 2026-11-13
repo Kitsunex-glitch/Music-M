@@ -139,7 +139,14 @@ namespace VK_UI3.DownloadTrack
 
                         var a = iVKGetAudio.listAudio[downloaded].audio;
 
-                        if (a.Url == null)
+                        // Скачиваем всегда в MP3-совместимом виде: резолвер выберет mp3/aac,
+                        // если у трека нет прямого URL.
+                        var downloadSource = Services.Player.AudioPlaybackResolver.Resolve(
+                            a,
+                            Models.PlaybackType.Auto,
+                            ffmpegAvailable: true);
+
+                        if (!downloadSource.IsValid)
                         {
                             downloaded++;
                             error = true;
@@ -147,7 +154,7 @@ namespace VK_UI3.DownloadTrack
                             continue;
                         }
 
-                        string input = a.Url.ToString();
+                        string input = downloadSource.Url.ToString();
                         var invalidChars = Path.GetInvalidFileNameChars();
                         var titl = $"{a.Artist} - {a.Title}.mp3";
                         titl = new string(titl.Where(ch => !invalidChars.Contains(ch)).ToArray());

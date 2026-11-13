@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using TagLib.Mpeg;
 using VK_UI3;
+using VK_UI3.Services.Player;
 using VkNet.Model.Attachments;
 using Windows.Media;
 using Windows.Media.Playback;
@@ -27,11 +28,23 @@ public class VkMediaSource : MediaSourceBase
     public override async Task<bool> OpenWithMediaPlayerAsync(MediaPlayer player, Audio track,
         CancellationToken cancellationToken = default, AudioEqualizer equalizer = null)
     {
-        if (string.IsNullOrEmpty(track.Url.ToString())) return false;
+        if (track == null || !AudioPlaybackResolver.HasPlayableSource(track)) return false;
+
+        // Выбираем поток согласно настройке «Тип воспроизведения».
+        // Если выбранного формата у трека нет — резолвер вернёт первый доступный.
+        var resolved = Resolve(track);
+
+        if (!resolved.IsValid)
+        {
+            _logger.Warn($"[Playback] No playable stream for track {track.Id}: {resolved.FallbackReason}");
+            return false;
+        }
+
+        var sourceUrl = resolved.Url.ToString();
 
         try
         {
-            var rtMediaSource = await CreateWinRtMediaSource(track, cancellationToken: cancellationToken);
+            var rtMediaSource = await CreateWinRtMediaSource(sourceUrl, cancellationToken: cancellationToken);
 
             var eq = "";
             if (equalizer != null)
@@ -140,7 +153,7 @@ public class VkMediaSource : MediaSourceBase
                 // i think its better to use task.run over task.yield because we aren't doing async with ffmpeg
                 var playbackItem = await Task.Run(() =>
                 {
-                    using var file = MediaFile.Open(track.Url.ToString(), mediaOptions);
+                    using var file = MediaFile.Open(sourceUrl, mediaOptions);
 
                     return CreateMediaPlaybackItem(file);
                 }, cancellationToken);

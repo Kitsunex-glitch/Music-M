@@ -52,6 +52,17 @@ namespace VK_UI3.Services
 
         #region Properties
 
+        /// <summary>
+        /// Фактически использованный режим воспроизведения текущего трека.
+        /// Может отличаться от выбранного в настройках, если нужного формата нет у трека.
+        /// </summary>
+        public static ResolvedStream CurrentPlaybackStream { get; private set; }
+
+        /// <summary>
+        /// Человекочитаемое описание фактического режима, например «AAC (откат от «FLAC»)».
+        /// </summary>
+        public static string CurrentPlaybackStreamName => CurrentPlaybackStream?.DisplayName;
+
         public static Windows.Media.Playback.MediaPlayer MediaPlayer
         {
             get { return _mediaPlayer; }
@@ -743,7 +754,7 @@ namespace VK_UI3.Services
         private static bool ShouldSkipTrack(ExtendedAudio trackdata)
         {
             return trackdata?.audio == null ||
-                   trackdata.audio.Url == null ||
+                   !AudioPlaybackResolver.HasPlayableSource(trackdata.audio) ||
                    new DB.SkipPerformerDB().skipIsSet(trackdata.audio.Artist);
         }
 
@@ -763,7 +774,18 @@ namespace VK_UI3.Services
 
             try
             {
-                var mediaSource = Windows.Media.Core.MediaSource.CreateFromUri(new Uri(trackdata.audio.Url.ToString()));
+                // Выбираем поток согласно настройке «Тип воспроизведения» (с откатом к доступному).
+                var resolved = MediaSourceBase.Resolve(trackdata.audio);
+
+                if (!resolved.IsValid)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[TrackSwitch] No playable stream: {resolved.FallbackReason}");
+                    return;
+                }
+
+                CurrentPlaybackStream = resolved;
+
+                var mediaSource = Windows.Media.Core.MediaSource.CreateFromUri(new Uri(resolved.Url.ToString()));
                 var mediaPlaybackItem = new Windows.Media.Playback.MediaPlaybackItem(mediaSource);
 
                 // Подписываемся на события для корректной очистки
@@ -1098,7 +1120,7 @@ namespace VK_UI3.Services
 
                 // Получаем следующий трек
                 var nextTrack = await iVKGetAudio?.GetTrackPlay(false);
-                if (nextTrack == null || string.IsNullOrEmpty(nextTrack.audio?.Url?.ToString()))
+                if (nextTrack == null || !AudioPlaybackResolver.HasPlayableSource(nextTrack.audio))
                 {
                     return;
                 }

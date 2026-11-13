@@ -173,22 +173,58 @@ namespace VkNet.Model.Attachments
 
 
         [JsonProperty("audio_chart_info")]
-		public	AudioChartInfo AudioChartInfo { get; set; }
+  public	AudioChartInfo AudioChartInfo { get; set; }
 
         [JsonProperty("thumb")]
         public AudioCover? Thumb { get; set; }
 
+        /// <summary>
+        /// Тип правовых уведомлений.
+        /// </summary>
+        [JsonProperty("legal_notices_type")]
+        public int? LegalNoticesType { get; set; }
 
+        /// <summary>
+        /// Рекламная информация о треке.
+        /// </summary>
+        [JsonProperty("ads")]
+        public AudioAds Ads { get; set; }
 
-        /*
-		 * "[ads, {
-		  ""content_id"": ""-2001619099_128619099"",
-		  ""duration"": ""171"",
-		  ""account_age_type"": ""3"",
-		  ""puid1"": ""554"",
-		  ""puid22"": ""14""
-		}]"
-		 */
+        /// <summary>
+        /// Доступные аудиопотоки трека (aac, dash, flac, hls, mp3 и т.п.).
+        /// </summary>
+        [JsonProperty("audio_streams")]
+        public IEnumerable<AudioStream> AudioStreams { get; set; }
+
+        /// <summary>
+        /// <c>true</c>, если трек отмечен "нравится".
+        /// </summary>
+        [JsonProperty("like")]
+        public bool? Like { get; set; }
+
+        /// <summary>
+        /// Идентификатор трека.
+        /// </summary>
+        [JsonProperty("track_id")]
+        public long? TrackId { get; set; }
+
+        /// <summary>
+        /// <c>true</c>, если трек официальный.
+        /// </summary>
+        [JsonProperty("is_official")]
+        public bool? IsOfficial { get; set; }
+
+        /// <summary>
+        /// Основной цвет обложки трека (например, #FBFBFB).
+        /// </summary>
+        [JsonProperty("main_color")]
+        public string MainColor { get; set; }
+
+        /// <summary>
+        /// Идентификатор файла.
+        /// </summary>
+        [JsonProperty("file_id")]
+        public string FileId { get; set; }
 
         #region Методы
 
@@ -218,7 +254,15 @@ namespace VkNet.Model.Attachments
 				Date = response["date"],
 				MainArtists = response["main_artists"].ToReadOnlyCollectionOf<AudioArtist>(x => x),
 				FeaturedArtists = response["featured_artists"].ToReadOnlyCollectionOf<AudioArtist>(x => x),
-				Subtitle = response["subtitle"]
+				Subtitle = response["subtitle"],
+				LegalNoticesType = response["legal_notices_type"],
+				Ads = response["ads"],
+				AudioStreams = response["audio_streams"].ToReadOnlyCollectionOf<AudioStream>(x => x),
+				Like = response["like"],
+				TrackId = response["track_id"],
+				IsOfficial = response["is_official"],
+				MainColor = response["main_color"],
+				FileId = response["file_id"]
 			};
 		}
 

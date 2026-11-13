@@ -135,7 +135,7 @@ namespace VK_UI3.Controls
         {
        
             bool isOwner = dataTrack.audio.OwnerId == AccountsDB.activeAccount.id;
-            if (dataTrack.audio.Url == null)
+            if (!Services.Player.AudioPlaybackResolver.HasPlayableSource(dataTrack.audio))
             {
                 this.Opacity = 0.3; 
             }
@@ -352,7 +352,7 @@ namespace VK_UI3.Controls
         private void UCcontrol_PointerEntered(object sender, PointerRoutedEventArgs e)
         {
             if (dataTrack == null) return;
-            if (dataTrack.audio.Url == null) return;
+            if (!Services.Player.AudioPlaybackResolver.HasPlayableSource(dataTrack.audio)) return;
             entered = true;
             isPointerOver = true;
 

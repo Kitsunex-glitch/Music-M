@@ -252,6 +252,10 @@
                         HorizontalAlignment="Stretch"
                         VerticalAlignment="Stretch"
                         Spacing="8">
+                        <Border Padding="8">
+                            <local:PlaybackModeSetting />
+                        </Border>
+
                         <Border>
                             <local:UseFfmpegForPlaybackSetting AutomationProperties.HelpText="Включает или выключает использование FFMPEG для декодирования аудио" AutomationProperties.Name="Использовать FFMPEG для воспроизведения" />
                         </Border>

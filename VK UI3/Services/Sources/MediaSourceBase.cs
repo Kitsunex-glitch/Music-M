@@ -7,6 +7,8 @@ using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading;
 using System.Threading.Tasks;
+using VK_UI3.Models;
+using VK_UI3.Services.Player;
 using VkNet.Model.Attachments;
 using Windows.Foundation.Collections;
 using Windows.Media.Core;
@@ -546,6 +548,52 @@ public abstract class MediaSourceBase : ITrackMediaSource
 
     public static Task<FFmpegInteropX.FFmpegMediaSource> CreateWinRtMediaSource(Audio data, IReadOnlyDictionary<string, string>? customOptions = null, CancellationToken cancellationToken = default)
     {
+        return CreateWinRtMediaSource(ResolveStreamUrl(data), customOptions, cancellationToken);
+    }
+
+    /// <summary>
+    /// Определяет URL потока трека согласно выбранному режиму воспроизведения.
+    /// При отсутствии выбранного формата возвращает первый доступный.
+    /// </summary>
+    public static string ResolveStreamUrl(Audio data, PlaybackType? requested = null)
+    {
+        var resolved = Resolve(data, requested);
+
+        return resolved?.Url?.ToString();
+    }
+
+    /// <summary>
+    /// Выбирает поток трека с учётом настроек и доступности FFmpeg.
+    /// </summary>
+    public static ResolvedStream Resolve(Audio data, PlaybackType? requested = null)
+    {
+        var mode = requested ?? PlaybackTypeHelper.GetSelected();
+
+        bool ffmpegAvailable;
+
+        try
+        {
+            ffmpegAvailable = new VK_UI3.DownloadTrack.CheckFFmpeg().IsExist();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[Playback] FFmpeg availability check failed: {ex.Message}");
+            ffmpegAvailable = false;
+        }
+
+        var resolved = AudioPlaybackResolver.Resolve(data, mode, ffmpegAvailable);
+
+        Debug.WriteLine($"[Playback] Requested={mode}, actual={resolved.ActualType}, fallback={resolved.IsFallback}, " +
+                        $"url={resolved.Url?.Host}/{resolved.StreamType} {resolved.FallbackReason}");
+
+        return resolved;
+    }
+
+    public static Task<FFmpegInteropX.FFmpegMediaSource> CreateWinRtMediaSource(string sourceUrl, IReadOnlyDictionary<string, string>? customOptions = null, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(sourceUrl))
+            throw new ArgumentException("Не удалось определить URL потока для воспроизведения", nameof(sourceUrl));
+
         var mediaOptions = GetMediaOptions();
         var options = new PropertySet();
 
@@ -565,7 +613,7 @@ public abstract class MediaSourceBase : ITrackMediaSource
                     options[key] = value;
 
 
-        return FFmpegInteropX.FFmpegMediaSource.CreateFromUriAsync(data.Url.ToString(), new()
+        return FFmpegInteropX.FFmpegMediaSource.CreateFromUriAsync(sourceUrl, new()
         {
             FFmpegOptions = options,
             General =
