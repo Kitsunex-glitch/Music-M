@@ -9,6 +9,7 @@
     mc:Ignorable="d">
 
     <Border
+        x:Name="RootBorder"
         Padding="12,12"
         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
@@ -91,6 +92,7 @@
                     Margin="6,0,0,0"
                     Padding="0"
                     VerticalAlignment="Center"
+                    AutomationProperties.Name="Сбросить к стандартной комбинации"
                     Background="Transparent"
                     BorderThickness="0"
                     Click="ResetButton_Click"
@@ -103,6 +105,19 @@
                 </Button>
 
             </Grid>
+
+            <!--  Скрытая область для объявлений экранному диктору (Narrator)  -->
+            <TextBlock
+                x:Name="AccessibilityLiveRegion"
+                Grid.Row="0"
+                Grid.RowSpan="2"
+                Width="1"
+                Height="1"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Top"
+                IsHitTestVisible="False"
+                Opacity="0"
+                AutomationProperties.LiveSetting="Assertive" />
         </Grid>
     </Border>
 </UserControl>

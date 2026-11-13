@@ -197,10 +197,75 @@ namespace VK_UI3.Views
             _ = CreateNavigation();
             dispatcherQueue = this.DispatcherQueue;
 
+            ConfigureSettingsButtonAccessibility();
+
             MainWindow.mainWindow.MainWindow_showRefresh();
 
             CheckMemberVK();
 
+        }
+
+        /// <summary>
+        /// Настраивает доступность встроенной кнопки «Параметры» для экранного диктора (Narrator),
+        /// чтобы незрячие пользователи понимали, как открыть настройки (включая горячие клавиши).
+        /// </summary>
+        private void ConfigureSettingsButtonAccessibility()
+        {
+            try
+            {
+                var settingsButton = FindSettingsButton(NavWiv);
+                if (settingsButton == null)
+                {
+                    // Кнопка настроек может создаваться при первом раскрытии панели — пробуем позже.
+                    DispatcherQueue.TryEnqueue(() =>
+                    {
+                        var btn = FindSettingsButton(NavWiv);
+                        ApplySettingsButtonAccessibility(btn);
+                    });
+                    return;
+                }
+
+                ApplySettingsButtonAccessibility(settingsButton);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainView] ConfigureSettingsButtonAccessibility failed: {ex.Message}");
+            }
+        }
+
+        private static void ApplySettingsButtonAccessibility(Microsoft.UI.Xaml.Controls.Button settingsButton)
+        {
+            if (settingsButton == null) return;
+
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(settingsButton, "Параметры");
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetHelpText(settingsButton,
+                "Открывает настройки приложения. Внутри раздела «Горячие клавиши» можно настроить управление воспроизведением.");
+        }
+
+        /// <summary>
+        /// Рекурсивно ищет встроенную кнопку настроек NavigationView.
+        /// </summary>
+        private static Microsoft.UI.Xaml.Controls.Button FindSettingsButton(DependencyObject root)
+        {
+            if (root == null) return null;
+
+            int count = VisualTreeHelper.GetChildrenCount(root);
+            for (int i = 0; i < count; i++)
+            {
+                var child = VisualTreeHelper.GetChild(root, i);
+                if (child is Microsoft.UI.Xaml.Controls.Button button && button.Name == "SettingsButton")
+                {
+                    return button;
+                }
+
+                var result = FindSettingsButton(child);
+                if (result != null)
+                {
+                    return result;
+                }
+            }
+
+            return null;
         }
 
         private void CollapseAnimationPlayingList_Completed(object sender, object e)

@@ -102,6 +102,8 @@
 						HorizontalAlignment="Stretch"
 						VerticalAlignment="Center"
 						Clip="{x:Null}"
+						AutomationProperties.Name="Позиция трека"
+						AutomationProperties.HelpText="Позволяет перемотать текущий трек. Используйте стрелки влево и вправо."
 						Maximum="{x:Bind TrackDurationMs, Mode=TwoWay, Converter={StaticResource LongToDoubleConverter}}"
 						Minimum="0"
 						PointerEntered="VolumeSlider_PointerEntered"
@@ -164,7 +166,8 @@
 						Padding="0"
 						Background="Transparent"
 						Tapped="repeatBTN_Tapped"
-						AutomationProperties.Name="Повтор">
+						AutomationProperties.Name="Режим воспроизведения"
+						AutomationProperties.HelpText="Переключает режим: повтор одного трека, повтор всех треков, перемешать">
 						<FontIcon
 							x:Name="repeatBTNIcon"
 							FontSize="14"
@@ -183,18 +186,21 @@
 						FocusVisualPrimaryBrush="Transparent"
 						FocusVisualSecondaryThickness="0"
 						Tapped="PreviousBTN_Tapped"
-						AutomationProperties.Name="Предыдущий трек">
+						AutomationProperties.Name="Предыдущий трек"
+						AutomationProperties.HelpText="Переходит к предыдущему треку">
 						<FontIcon FontSize="12" Glyph="" />
 					</Button>
 
 					<Button
+						x:Name="PlayButtonHost"
 						Width="40"
 						Height="40"
 						Margin="8,0,8,0"
 						Padding="0"
 						Background="Transparent"
 						Tapped="Button_Play_Tapped"
-						AutomationProperties.Name="Воспроизвести">
+						AutomationProperties.Name="Воспроизвести"
+						AutomationProperties.HelpText="Запускает или останавливает воспроизведение текущего трека">
 						<FontIcon
 							x:Name="PlayBTN"
 							FontSize="14"
@@ -209,7 +215,8 @@
 						Padding="0"
 						Background="Transparent"
 						Tapped="NextBTN_Tapped"
-						AutomationProperties.Name="Следующий трек">
+						AutomationProperties.Name="Следующий трек"
+						AutomationProperties.HelpText="Переходит к следующему треку">
 						<FontIcon FontSize="12" Glyph="" />
 					</Button>
 
@@ -217,12 +224,14 @@
 
 
 					<Button
+						x:Name="VolumeButton"
 						Grid.Column="4"
 						Width="35"
 						Height="35"
 						Padding="0"
 						Background="Transparent"
-						AutomationProperties.Name="Громкость">
+						AutomationProperties.Name="Громкость"
+						AutomationProperties.HelpText="Открывает регулятор громкости">
 						<FontIcon FontSize="14" Glyph="&#xE995;" />
 						<Button.Flyout>
 							<Flyout>
@@ -236,6 +245,8 @@
 										Background="AliceBlue"
 										Minimum="0"
 										Orientation="Horizontal"
+										AutomationProperties.Name="Громкость"
+										AutomationProperties.HelpText="Регулирует громкость воспроизведения. Используйте стрелки влево и вправо."
 										PointerEntered="SoundSlider_PointerEntered"
 										PointerExited="SoundSlider_PointerExited"
 										StepFrequency="1"
@@ -421,7 +432,16 @@
 
 		</Grid>
 
-
+		<!--  Скрытая область для объявлений экранному диктору (Narrator)  -->
+		<TextBlock
+			x:Name="AccessibilityLiveRegion"
+			Width="1"
+			Height="1"
+			HorizontalAlignment="Left"
+			VerticalAlignment="Top"
+			IsHitTestVisible="False"
+			Opacity="0"
+			AutomationProperties.LiveSetting="Assertive" />
 
 	</Grid>
 

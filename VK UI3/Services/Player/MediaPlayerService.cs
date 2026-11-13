@@ -453,6 +453,71 @@ namespace VK_UI3.Services
             _mediaPlayer.PlaybackSession.Position = TimeSpan.Zero;
         }
 
+        /// <summary>
+        /// Запускает воспроизведение (или подгружает текущий трек, если ничего не загружено).
+        /// </summary>
+        public static void Play()
+        {
+            if (_mediaPlayer.Source == null && iVKGetAudio?.currentTrack != null)
+            {
+                _ = PlayTrack();
+            }
+            else
+            {
+                _mediaPlayer.Play();
+            }
+        }
+
+        /// <summary>
+        /// Ставит воспроизведение на паузу.
+        /// </summary>
+        public static void Pause()
+        {
+            _mediaPlayer.Pause();
+        }
+
+        /// <summary>
+        /// Перематывает трек на указанное количество секунд (положительное — вперёд, отрицательное — назад).
+        /// Позиция ограничивается диапазоном [0, длительность трека].
+        /// </summary>
+        public static void SeekBy(double seconds)
+        {
+            try
+            {
+                var session = _mediaPlayer.PlaybackSession;
+                if (session == null) return;
+
+                var target = session.Position + TimeSpan.FromSeconds(seconds);
+                if (target < TimeSpan.Zero)
+                    target = TimeSpan.Zero;
+
+                var duration = session.NaturalDuration;
+                if (duration > TimeSpan.Zero && target > duration)
+                    target = duration;
+
+                session.Position = target;
+                System.Diagnostics.Debug.WriteLine($"[MediaPlayerService] SeekBy {seconds:+0;-0}с -> {target}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MediaPlayerService] SeekBy error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Шаг перемотки в секундах из настроек (по умолчанию 10 секунд).
+        /// </summary>
+        public static int SeekStepSeconds
+        {
+            get
+            {
+                var setting = SettingsTable.GetSetting("SeekStepSeconds");
+                if (setting != null && int.TryParse(setting.settingValue, out var value) && value > 0)
+                    return value;
+                return 10;
+            }
+        }
+
         #endregion
 
         #region Public Methods
@@ -1085,12 +1150,28 @@ namespace VK_UI3.Services
                     _ = TogglePlayPause();
                     break;
 
+                case PlayerAction.Play:
+                    Play();
+                    break;
+
+                case PlayerAction.Pause:
+                    Pause();
+                    break;
+
                 case PlayerAction.NextTrack:
                     PlayNextTrack();
                     break;
 
                 case PlayerAction.PreviousTrack:
                     HandlePreviousTrack();
+                    break;
+
+                case PlayerAction.SeekForward:
+                    SeekBy(SeekStepSeconds);
+                    break;
+
+                case PlayerAction.SeekBackward:
+                    SeekBy(-SeekStepSeconds);
                     break;
 
                 case PlayerAction.VolumeUp:
@@ -1103,6 +1184,10 @@ namespace VK_UI3.Services
 
                 case PlayerAction.Mute:
                     IsMuted = !IsMuted;
+                    break;
+
+                case PlayerAction.Shuffle:
+                    PlaybackModeService.CycleMode();
                     break;
 
                 case PlayerAction.Stop:

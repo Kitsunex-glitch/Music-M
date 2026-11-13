@@ -41,6 +41,11 @@ namespace VK_UI3.Models
         public string DisplayActionName => GetActionDisplayName();
 
         /// <summary>
+        /// Подробное описание действия для экранного диктора (Narrator).
+        /// </summary>
+        public string DisplayActionDescription => GetActionDescription();
+
+        /// <summary>
         /// Человекочитаемое представление комбинации клавиш.
         /// </summary>
         public string DisplayKeyCombination => GetKeyCombinationDisplayName();
@@ -62,13 +67,41 @@ namespace VK_UI3.Models
             return Action switch
             {
                 PlayerAction.PlayPause => "Воспроизведение / Пауза",
+                PlayerAction.Play => "Воспроизвести",
+                PlayerAction.Pause => "Пауза",
                 PlayerAction.NextTrack => "Следующий трек",
                 PlayerAction.PreviousTrack => "Предыдущий трек",
+                PlayerAction.SeekForward => "Перемотка вперёд",
+                PlayerAction.SeekBackward => "Перемотка назад",
                 PlayerAction.VolumeUp => "Громкость +",
                 PlayerAction.VolumeDown => "Громкость -",
                 PlayerAction.Mute => "Отключить звук",
+                PlayerAction.Shuffle => "Перемешать",
                 PlayerAction.Stop => "Остановить",
                 _ => Action.ToString()
+            };
+        }
+
+        /// <summary>
+        /// Возвращает подробное описание действия для экранного диктора.
+        /// </summary>
+        private string GetActionDescription()
+        {
+            return Action switch
+            {
+                PlayerAction.PlayPause => "Переключает воспроизведение и паузу текущего трека",
+                PlayerAction.Play => "Запускает воспроизведение текущего трека",
+                PlayerAction.Pause => "Ставит воспроизведение на паузу",
+                PlayerAction.NextTrack => "Переключает на следующий трек в списке",
+                PlayerAction.PreviousTrack => "Возвращает к предыдущему треку",
+                PlayerAction.SeekForward => "Перематывает трек вперёд на выбранное в настройках число секунд",
+                PlayerAction.SeekBackward => "Перематывает трек назад на выбранное в настройках число секунд",
+                PlayerAction.VolumeUp => "Повышает громкость на пять процентов",
+                PlayerAction.VolumeDown => "Понижает громкость на пять процентов",
+                PlayerAction.Mute => "Включает или выключает звук",
+                PlayerAction.Shuffle => "Переключает режим воспроизведения: повтор одного, повтор всех, перемешивание",
+                PlayerAction.Stop => "Останавливает воспроизведение и перематывает трек в начало",
+                _ => string.Empty
             };
         }
 
@@ -194,25 +227,32 @@ namespace VK_UI3.Models
             switch (action)
             {
                 case PlayerAction.PlayPause:
-                    binding.KeyCode = 0; // Не назначаем, обрабатывается через WM_APPCOMMAND
-                    break;
+                case PlayerAction.Play:
+                case PlayerAction.Pause:
                 case PlayerAction.NextTrack:
-                    binding.KeyCode = 0; // Не назначаем, обрабатывается через WM_APPCOMMAND
-                    break;
                 case PlayerAction.PreviousTrack:
-                    binding.KeyCode = 0; // Не назначаем, обрабатывается через WM_APPCOMMAND
-                    break;
                 case PlayerAction.VolumeUp:
-                    binding.KeyCode = 0; // Не назначаем, обрабатывается через WM_APPCOMMAND
-                    break;
                 case PlayerAction.VolumeDown:
-                    binding.KeyCode = 0; // Не назначаем, обрабатывается через WM_APPCOMMAND
-                    break;
                 case PlayerAction.Mute:
-                    binding.KeyCode = 0; // Не назначаем, обрабатывается через WM_APPCOMMAND
-                    break;
                 case PlayerAction.Stop:
                     binding.KeyCode = 0; // Не назначаем, обрабатывается через WM_APPCOMMAND
+                    break;
+
+                // Новые действия не имеют медиа-клавиш, поэтому предлагаем удобные комбинации по умолчанию.
+                case PlayerAction.SeekForward:
+                    binding.KeyCode = 0x27; // VK_RIGHT
+                    binding.Modifiers = VirtualKeyModifiers.Control | VirtualKeyModifiers.Menu;
+                    binding.IsEnabled = true;
+                    break;
+                case PlayerAction.SeekBackward:
+                    binding.KeyCode = 0x25; // VK_LEFT
+                    binding.Modifiers = VirtualKeyModifiers.Control | VirtualKeyModifiers.Menu;
+                    binding.IsEnabled = true;
+                    break;
+                case PlayerAction.Shuffle:
+                    binding.KeyCode = 0x53; // 'S'
+                    binding.Modifiers = VirtualKeyModifiers.Control | VirtualKeyModifiers.Menu;
+                    binding.IsEnabled = true;
                     break;
             }
 

@@ -19,7 +19,10 @@ namespace VK_UI3.Views.Settings
             this.Loaded += HotkeySettingsExpander_Loaded;
 
             AutomationProperties.SetName(this, "Горячие клавиши");
-            AutomationProperties.SetHelpText(this, "Настройки горячих клавиш для управления воспроизведением музыки");
+            AutomationProperties.SetHelpText(this,
+                "Настройки горячих клавиш для управления воспроизведением музыки. " +
+                "Перемещайтесь между действиями клавишей Tab или стрелками, " +
+                "чтобы услышать название действия и назначенную комбинацию.");
         }
 
         private void HotkeySettingsExpander_Loaded(object sender, RoutedEventArgs e)
@@ -39,6 +42,19 @@ namespace VK_UI3.Views.Settings
             }
 
             Debug.WriteLine("[HotkeySettingsExpander] Loaded hotkey controls");
+        }
+
+        /// <summary>
+        /// Озвучивает сообщение экранному диктору (Narrator) через LiveRegion.
+        /// </summary>
+        private void AnnounceToScreenReader(string message)
+        {
+            if (AccessibilityLiveRegion == null) return;
+
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                AccessibilityLiveRegion.Text = message;
+            });
         }
 
         private async void DisableAllButton_Click(object sender, RoutedEventArgs e)
@@ -66,6 +82,7 @@ namespace VK_UI3.Views.Settings
                         }
                     }
                     LoadHotkeyControls();
+                    AnnounceToScreenReader("Все горячие клавиши отключены");
                 }
             }
         }
@@ -86,6 +103,7 @@ namespace VK_UI3.Views.Settings
             {
                 HotkeyService.Instance?.ResetToDefaults();
                 LoadHotkeyControls();
+                AnnounceToScreenReader("Все горячие клавиши сброшены к стандартным комбинациям");
             }
         }
 
@@ -114,6 +132,7 @@ namespace VK_UI3.Views.Settings
                         }
                     }
                     LoadHotkeyControls();
+                    AnnounceToScreenReader("Все горячие клавиши включены");
                 }
             }
         }

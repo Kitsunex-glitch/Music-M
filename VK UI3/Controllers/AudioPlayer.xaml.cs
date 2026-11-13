@@ -268,11 +268,35 @@ namespace VK_UI3.Controllers
         {
             UpdateTrackInfoDisplay();
             UpdateDiscordState();
+
+            // Объявляем смену трека экранному диктору.
+            var track = TrackDataThis;
+            if (track?.audio != null)
+            {
+                AnnounceToScreenReader($"Сейчас играет: {track.audio.Artist} — {track.audio.Title}");
+            }
         }
 
         private void MediaPlayerService_VolumeChanged(object sender, VK_UI3.Services.Player.VolumeChangedEventArgs e)
         {
             OnPropertyChanged(nameof(simpleAudioBind));
+            UpdateVolumeButtonAccessibility();
+        }
+
+        /// <summary>
+        /// Обновляет доступную подпись кнопки громкости для экранного диктора.
+        /// </summary>
+        private void UpdateVolumeButtonAccessibility()
+        {
+            if (VolumeButton == null) return;
+
+            var volume = VK_UI3.Services.MediaPlayerService.MediaPlayer?.Volume ?? 1.0;
+            var percent = (int)Math.Round(volume * 100);
+            var muted = VK_UI3.Services.MediaPlayerService.IsMuted;
+            var name = muted ? "Громкость, звук отключён" : $"Громкость, {percent} процентов";
+
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(VolumeButton, name);
+            ToolTipService.SetToolTip(VolumeButton, name);
         }
 
         private void MediaPlayerService_PositionChanged(object sender, TimeSpan e)
@@ -514,16 +538,9 @@ namespace VK_UI3.Controllers
         {
             try
             {
-                var currentSetting = SettingsTable.GetSetting("playNext").settingValue;
-                string newSetting = currentSetting switch
-                {
-                    "RepeatOne" => "RepeatAll",
-                    "RepeatAll" => "Shuffle",
-                    "Shuffle" => "RepeatOne",
-                    _ => "RepeatOne"
-                };
-
-                SettingsTable.SetSetting("playNext", newSetting);
+                // Логика переключения режима вынесена в общий сервис,
+                // чтобы кнопка и горячая клавиша вели себя одинаково.
+                VK_UI3.Services.Player.PlaybackModeService.CycleMode();
                 setButtonPlayNext();
             }
             catch { }
@@ -548,28 +565,35 @@ namespace VK_UI3.Controllers
         {
             try
             {
-                if (SettingsTable.GetSetting("playNext") == null)
+                var mode = VK_UI3.Services.Player.PlaybackModeService.CurrentMode;
+
+                switch (mode)
                 {
-                    SettingsTable.SetSetting("playNext", "RepeatAll");
+                    case VK_UI3.Services.Player.PlaybackModeService.RepeatOne:
+                        animateFontIcon.ChangeFontIconWithAnimation("\uE8ED");
+                        break;
+                    case VK_UI3.Services.Player.PlaybackModeService.Shuffle:
+                        animateFontIcon.ChangeFontIconWithAnimation("\uE8B1");
+                        break;
+                    case VK_UI3.Services.Player.PlaybackModeService.RepeatAll:
+                        animateFontIcon.ChangeFontIconWithAnimation("\uE8EE");
+                        break;
                 }
 
-                switch (SettingsTable.GetSetting("playNext").settingValue)
-                {
-                    case "RepeatOne":
-                        animateFontIcon.ChangeFontIconWithAnimation("\uE8ED");
-                        iVKGetAudio?.UnShuffleList();
-                        break;
-                    case "Shuffle":
-                        animateFontIcon.ChangeFontIconWithAnimation("\uE8B1");
-                        iVKGetAudio?.setShuffle();
-                        break;
-                    case "RepeatAll":
-                        animateFontIcon.ChangeFontIconWithAnimation("\uE8EE");
-                        iVKGetAudio?.UnShuffleList();
-                        break;
-                }
+                UpdateRepeatButtonAccessibility(mode);
             }
             catch { }
+        }
+
+        /// <summary>
+        /// Обновляет доступное описание кнопки режима воспроизведения для экранного диктора.
+        /// </summary>
+        private void UpdateRepeatButtonAccessibility(string mode)
+        {
+            var modeName = VK_UI3.Services.Player.PlaybackModeService.GetModeDisplayName(mode);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(repeatBTN, "Режим воспроизведения: " + modeName);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetHelpText(repeatBTN, "Переключает режим: повтор одного трека, повтор всех треков, перемешать. Текущий режим: " + modeName);
+            ToolTipService.SetToolTip(repeatBTN, modeName);
         }
 
         public void setStatusIcon()
@@ -782,14 +806,46 @@ namespace VK_UI3.Controllers
                 {
                     case MediaPlayerState.Playing:
                         changeIconPlayBTN.ChangeFontIconWithAnimation("\uE769"); // Pause icon
+                        UpdatePlayButtonAccessibility(isPlaying: true);
                         break;
                     case MediaPlayerState.Paused:
                         changeIconPlayBTN.ChangeFontIconWithAnimation("\uE768"); // Play icon
+                        UpdatePlayButtonAccessibility(isPlaying: false);
                         break;
                     case MediaPlayerState.Closed:
                         changeIconPlayBTN.ChangeFontIconWithAnimation("\uE768"); // Play icon
+                        UpdatePlayButtonAccessibility(isPlaying: false);
                         break;
                 }
+            });
+        }
+
+        /// <summary>
+        /// Обновляет доступную подпись главной кнопки воспроизведения/паузы для экранного диктора.
+        /// </summary>
+        private void UpdatePlayButtonAccessibility(bool isPlaying)
+        {
+            if (PlayButtonHost == null) return;
+
+            var name = isPlaying ? "Пауза" : "Воспроизвести";
+            var help = isPlaying
+                ? "Останавливает воспроизведение текущего трека"
+                : "Запускает воспроизведение текущего трека";
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(PlayButtonHost, name);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetHelpText(PlayButtonHost, help);
+            ToolTipService.SetToolTip(PlayButtonHost, name);
+        }
+
+        /// <summary>
+        /// Озвучивает сообщение через LiveRegion для экранного диктора (Narrator).
+        /// </summary>
+        private void AnnounceToScreenReader(string message)
+        {
+            if (AccessibilityLiveRegion == null) return;
+
+            this.DispatcherQueue.TryEnqueue(() =>
+            {
+                AccessibilityLiveRegion.Text = message;
             });
         }
 

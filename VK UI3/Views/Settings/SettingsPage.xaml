@@ -204,6 +204,8 @@
                 Margin="0,0,0,8"
                 HorizontalAlignment="Stretch"
                 VerticalAlignment="Stretch"
+                AutomationProperties.HelpText="Раздел для настройки горячих клавиш управления воспроизведением: воспроизведение, пауза, перемотка, громкость, следующий и предыдущий трек, перемешивание. Разверните раздел клавишей Пробел или Enter."
+                AutomationProperties.Name="Горячие клавиши"
                 IsExpanded="False">
                 <Expander.Header>
                     <StackPanel Orientation="Horizontal" Spacing="8">

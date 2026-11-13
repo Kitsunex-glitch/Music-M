@@ -1,5 +1,6 @@
 ﻿using DevWinUI;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using System;
@@ -125,6 +126,11 @@ namespace VK_UI3.Views.Settings
 
             ActionDisplayName = _binding.DisplayActionName;
             MainShortcut.Title = $"{ActionDisplayName}";
+
+            // Экранный диктор: понятное название группы для каждого действия.
+            AutomationProperties.SetName(this, ActionDisplayName);
+            AutomationProperties.SetHelpText(this, _binding.DisplayActionDescription);
+
             UpdateUI();
 
             if (HotkeyService.Instance != null)
@@ -209,6 +215,7 @@ namespace VK_UI3.Views.Settings
             }
 
             UpdateUI();
+            AnnounceToScreenReader($"{ActionDisplayName}: комбинация сохранена — {KeyCombinationDisplay}");
             Debug.WriteLine($"[HotkeySettingControlDevWinUI] Saved new binding for {_action}: {KeyCombinationDisplay}");
         }
 
@@ -235,6 +242,7 @@ namespace VK_UI3.Views.Settings
                 _binding.IsEnabled = true;
                 HotkeyService.Instance?.UpdateBinding(_action, _binding.KeyCode, _binding.Modifiers, true);
                 UpdateUI();
+                AnnounceToScreenReader($"{ActionDisplayName}: горячая клавиша включена");
             }
         }
 
@@ -245,6 +253,7 @@ namespace VK_UI3.Views.Settings
                 _binding.IsEnabled = false;
                 HotkeyService.Instance?.UpdateBinding(_action, _binding.KeyCode, _binding.Modifiers, false);
                 UpdateUI();
+                AnnounceToScreenReader($"{ActionDisplayName}: горячая клавиша отключена");
             }
         }
 
@@ -260,6 +269,7 @@ namespace VK_UI3.Views.Settings
                 _binding.IsEnabled = defaultBinding.IsEnabled;
             }
             UpdateUI();
+            AnnounceToScreenReader($"{ActionDisplayName}: комбинация сброшена к стандартной");
         }
 
         #endregion
@@ -282,9 +292,53 @@ namespace VK_UI3.Views.Settings
                 ? Visibility.Visible
                 : Visibility.Collapsed;
 
+            UpdateAccessibility();
+
             OnPropertyChanged(nameof(ActionDisplayName));
             OnPropertyChanged(nameof(KeyCombinationDisplay));
             OnPropertyChanged(nameof(IsBindingEnabled));
+        }
+
+        /// <summary>
+        /// Обновляет доступные подписи элементов для экранного диктора (Narrator).
+        /// </summary>
+        private void UpdateAccessibility()
+        {
+            if (_binding == null) return;
+
+            var state = _binding.IsEnabled ? "включена" : "отключена";
+            var combination = _binding.KeyCode == 0 ? "не назначена" : _binding.DisplayKeyCombination;
+
+            AutomationProperties.SetName(this, ActionDisplayName);
+            AutomationProperties.SetHelpText(this,
+                $"{_binding.DisplayActionDescription}. Комбинация: {combination}. Горячая клавиша {state}.");
+
+            AutomationProperties.SetName(EnableCheckBox, $"Включить горячую клавишу: {ActionDisplayName}");
+            AutomationProperties.SetHelpText(EnableCheckBox, _binding.IsEnabled
+                ? "Горячая клавиша включена. Снимите флажок, чтобы отключить."
+                : "Горячая клавиша отключена. Установите флажок, чтобы включить.");
+
+            if (MainShortcut != null)
+            {
+                AutomationProperties.SetName(MainShortcut, $"{ActionDisplayName}: {combination}");
+                AutomationProperties.SetHelpText(MainShortcut,
+                    $"Текущая комбинация: {combination}. Нажмите, чтобы назначить новую комбинацию клавиш.");
+            }
+
+            AutomationProperties.SetHelpText(ResetButton, "Сбрасывает комбинацию к стандартной для этого действия");
+        }
+
+        /// <summary>
+        /// Озвучивает сообщение экранному диктору (Narrator) через LiveRegion.
+        /// </summary>
+        private void AnnounceToScreenReader(string message)
+        {
+            if (AccessibilityLiveRegion == null) return;
+
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                AccessibilityLiveRegion.Text = message;
+            });
         }
 
         /// <summary>
