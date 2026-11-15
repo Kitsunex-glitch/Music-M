@@ -1,20 +1,32 @@
-﻿<Page
+<Page
 	x:Class="VK_UI3.Views.ModalsPages.LyricsPage"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-	xmlns:cntrollers="using:VK_UI3.Controls"
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:dev="using:VK_UI3.Controls.BetterLyric"
 	xmlns:local="using:VK_UI3.Views.ModalsPages"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-	xmlns:winui="using:WinUICommunity"
 	HorizontalAlignment="Stretch"
 	Background="{ThemeResource AcrylicInAppFillColorBaseBrush}"
 	mc:Ignorable="d"
-    AutomationProperties.Name="Страница текста песни"
-    AutomationProperties.HelpText="Отображает текст песни с синхронизацией по времени">
+	AutomationProperties.HelpText="Отображает текст песни с синхронизацией по времени"
+	AutomationProperties.Name="Страница текста песни">
 
 	<Page.Resources>
-		<ThemeShadow x:Name="SharedShadow" />
+		<!--  Стиль группы настроек — как OptionGroup в галерее DevWinUI  -->
+		<Style x:Key="OptionGroupStyle" TargetType="Expander">
+			<Setter Property="HorizontalAlignment" Value="Stretch" />
+			<Setter Property="HorizontalContentAlignment" Value="Stretch" />
+			<!--  По умолчанию все группы свёрнуты  -->
+			<Setter Property="IsExpanded" Value="False" />
+			<Setter Property="Margin" Value="0,0,0,8" />
+		</Style>
+		<!--  OptionPanel: StackPanel со Spacing=16 и растягиванием детей  -->
+		<Style x:Key="OptionPanelStyle" TargetType="StackPanel">
+			<Setter Property="Spacing" Value="16" />
+			<Setter Property="HorizontalAlignment" Value="Stretch" />
+			<Setter Property="Padding" Value="0,8,0,4" />
+		</Style>
 	</Page.Resources>
 
 	<Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
@@ -23,96 +35,687 @@
 			<RowDefinition Height="*" />
 		</Grid.RowDefinitions>
 
-
-
-		<StackPanel
+		<!--  ТУЛБАР  -->
+		<Grid
 			Grid.Row="0"
-			Margin="10,10,10,0"
-			Padding="10,10,10,10"
-			HorizontalAlignment="Stretch"
-			VerticalAlignment="Top"
+			Margin="16,16,16,0"
+			Padding="12,8"
 			Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}"
-			CornerRadius="4"
-			Orientation="Horizontal">
-			<Button Margin="0,0,5,0" Click="Button_Click" AutomationProperties.Name="Закрыть страницу текста песни" AutomationProperties.HelpText="Закрывает окно с текстом песни">X</Button>
+			CornerRadius="8">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="*" />
+				<ColumnDefinition Width="Auto" />
+			</Grid.ColumnDefinitions>
+
+			<StackPanel
+				Grid.Column="0"
+				Orientation="Horizontal"
+				Spacing="8">
+				<Button
+					Width="36"
+					Height="36"
+					Padding="0"
+					Click="Button_Click"
+					CornerRadius="18"
+					AutomationProperties.HelpText="Закрывает окно с текстом песни"
+					AutomationProperties.Name="Закрыть страницу текста песни"
+					ToolTipService.ToolTip="Закрыть">
+					<FontIcon FontSize="14" Glyph="&#xE711;" />
+				</Button>
+
+				<Button
+					x:Name="CopyClipboard"
+					Height="36"
+					Click="CopyClipboard_Click"
+					CornerRadius="18"
+					AutomationProperties.HelpText="Копирует текст песни в буфер обмена"
+					AutomationProperties.Name="Скопировать текст песни"
+					ToolTipService.ToolTip="Скопировать текст">
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<FontIcon FontSize="14" Glyph="&#xE8C8;" />
+						<TextBlock VerticalAlignment="Center" Text="Скопировать" />
+					</StackPanel>
+				</Button>
+
+				<AppBarSeparator Height="24" VerticalAlignment="Center" />
+
+				<StackPanel VerticalAlignment="Center" Spacing="2">
+					<TextBlock
+						FontSize="11"
+						Opacity="0.6"
+						Style="{ThemeResource CaptionTextBlockStyle}"
+						Text="Источник" />
+					<ComboBox
+						x:Name="GeniusToggle"
+						MinWidth="130"
+						AutomationProperties.HelpText="Позволяет выбрать источник для получения текста песни"
+						AutomationProperties.Name="Выбор источника текста песни"
+						SelectionChanged="GeniusToggle_SelectionChanged" />
+				</StackPanel>
+
+				<StackPanel VerticalAlignment="Center" Spacing="2">
+					<TextBlock
+						FontSize="11"
+						Opacity="0.6"
+						Style="{ThemeResource CaptionTextBlockStyle}"
+						Text="Стиль" />
+					<ComboBox
+						x:Name="EffectsToggle"
+						MinWidth="150"
+						AutomationProperties.HelpText="Позволяет выбрать готовый визуальный стиль текста"
+						AutomationProperties.Name="Выбор визуального стиля текста"
+						SelectionChanged="EffectsToggle_SelectionChanged"
+						ToolTipService.ToolTip="Готовый пресет оформления" />
+				</StackPanel>
+			</StackPanel>
+
+			<TextBlock
+				x:Name="CreditsText"
+				Grid.Column="1"
+				Margin="16,0"
+				VerticalAlignment="Center"
+				Opacity="0.7"
+				Style="{ThemeResource CaptionTextBlockStyle}"
+				Text="{x:Bind Credits, Mode=OneWay}"
+				TextAlignment="Center"
+				TextTrimming="CharacterEllipsis"
+				TextWrapping="NoWrap" />
+
 			<Button
-				x:Name="CopyClipboard"
-				Margin="0,0,5,0"
-				Click="CopyClipboard_Click"
-                AutomationProperties.Name="Скопировать текст песни"
-                AutomationProperties.HelpText="Копирует текст песни в буфер обмена">
-				<StackPanel Orientation="Horizontal">
-					<FontIcon Margin="0,0,5,0" Glyph="&#xE8C8;" />
-					<TextBlock>Скопировать текст</TextBlock>
+				x:Name="SettingsButton"
+				Grid.Column="2"
+				Height="36"
+				Click="SettingsButton_Click"
+				CornerRadius="18"
+				AutomationProperties.HelpText="Открывает панель со всеми настройками отображения текста"
+				AutomationProperties.Name="Настройки отображения текста"
+				ToolTipService.ToolTip="Все настройки">
+				<StackPanel Orientation="Horizontal" Spacing="8">
+					<FontIcon FontSize="14" Glyph="&#xE713;" />
+					<TextBlock VerticalAlignment="Center" Text="Настройки" />
 				</StackPanel>
 			</Button>
+		</Grid>
 
-			<ComboBox x:Name="GeniusToggle" SelectionChanged="GeniusToggle_SelectionChanged" AutomationProperties.Name="Выбор источника текста песни" AutomationProperties.HelpText="Позволяет выбрать источник для получения текста песни" />
-		</StackPanel>
+		<!--  ОБЛАСТЬ ТЕКСТА  -->
+		<Grid Margin="20" CornerRadius="10" Grid.Row="1">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="*" />
+				<ColumnDefinition Width="Auto" />
+			</Grid.ColumnDefinitions>
 
+			<Grid Grid.Column="0"  >
+				<dev:BetterLyric
+					x:Name="LyricsView"
+					AutoWrap="True"
+					CurrentIsPlaying="True"
+					CurrentPosition="0:0:0"
+					Is3DLyricsEnabled="False"
+					IsAutoLayoutEnabled="True"
+					IsDynamicLyricsFontSize="True"
+					IsFanLyricsEnabled="False"
+					IsLyricsBlurEffectEnabled="True"
+					IsLyricsBrethingEffectEnabled="False"
+					IsLyricsFadeOutEffectEnabled="True"
+					IsLyricsFloatAnimationEnabled="True"
+					IsLyricsGlowEffectEnabled="True"
+					IsLyricsOutOfSightEffectEnabled="True"
+					IsLyricsScaleEffectEnabled="True"
+					IsLyricsVisible="True"
+					IsPhoneticEnabled="False"
+					IsScrollViewerEnabled="True"
+					IsTranslationEnabled="True"
+					LineClicked="LyricsView_LineClicked"
+					LyricsAlignmentType="Left"
+					LyricsFontWeight="SemiBold"
+					LyricsLineContentOrientation="Vertical"
+					LyricsLineOverallSpacingFactor="0.6"
+					LyricsScrollDuration="500"
+					LyricsScrollEasingMode="Out"
+					LyricsScrollEasingType="Quad"
+					LyricsWesternFontFamily="Segoe UI"
+					NonCurrentLineFillColor="White"
+					OriginalLyricsFontSize="24"
+					PlayedCurrentLineFillColor="White"
+					PlayedOriginalLyricsOpacity="100"
+					PlayingLineTopOffset="45"
+					TimelineSyncThreshold="150"
+					TranslatedLyricsOpacity="70"
+					UnplayedCurrentLineFillColor="White"
+					UnplayedOriginalLyricsOpacity="35"
+					WordByWordEffectMode="Auto"
+					AutomationProperties.HelpText="Синхронизированный текст песни, нажмите на строку для перемотки"
+					AutomationProperties.Name="Текст песни" />
 
-		<winui:OpacityMaskView
-			Grid.Row="1"
-			Grid.Column="0"
-			HorizontalAlignment="Stretch"
-			VerticalAlignment="Stretch">
-			<winui:OpacityMaskView.OpacityMask>
-				<LinearGradientBrush MappingMode="RelativeToBoundingBox" StartPoint="1,0" EndPoint="1,1">
-					<GradientStop Offset="0" Color="#00FFFFFF" />
-					<GradientStop Offset="0.1" Color="#FFFFFFFF" />
-					<GradientStop Offset="0.5" Color="#FFFFFFFF" />
-					<GradientStop Offset="0.99" Color="#FFFFFFFF" />
-					<GradientStop Offset="1" Color="#00FFFFFF" />
-				</LinearGradientBrush>
-			</winui:OpacityMaskView.OpacityMask>
-
-			<winui:OpacityMaskView HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-
-
-				<ListView
-					x:Name="ListLyrics"
-					Grid.Row="1"
-					Margin="0"
+				<Grid
+					x:Name="GridBRing"
 					Padding="10"
-					HorizontalAlignment="Stretch"
-					VerticalAlignment="Stretch"
-					HorizontalContentAlignment="Stretch"
-					ItemsSource="{x:Bind Texts, Mode=OneWay}"
-					SelectionMode="None"
-                    AutomationProperties.Name="Список строк текста песни"
-                    AutomationProperties.HelpText="Отображает строки текста песни с синхронизацией по времени">
+					HorizontalAlignment="Center"
+					VerticalAlignment="Center"
+					Background="{ThemeResource AcrylicBackgroundFillColorBaseBrush}"
+					CornerRadius="8"
+					AutomationProperties.HelpText="Отображается во время загрузки текста песни"
+					AutomationProperties.Name="Индикатор загрузки текста песни">
+					<ProgressRing
+						Width="100"
+						Height="100"
+						IsActive="True" />
+				</Grid>
+			</Grid>
 
-					<ListView.ItemContainerStyle>
-						<Style TargetType="ListViewItem">
-							<Setter Property="HorizontalContentAlignment" Value="Stretch" />
-						</Style>
-					</ListView.ItemContainerStyle>
+			<!--  ПАНЕЛЬ НАСТРОЕК: две менюшки (вкладки) в стиле галереи DevWinUI  -->
+			<Border
+				x:Name="SettingsPane"
+				Grid.Column="1"
+				Width="380"
+				Visibility="Collapsed"
+				Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}"
+				BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+				BorderThickness="1,0,0,0">
+				<Grid Width="380">
+					<Grid.RowDefinitions>
+						<RowDefinition Height="Auto" />
+						<RowDefinition Height="*" />
+					</Grid.RowDefinitions>
 
-					<ListView.ItemTemplate>
-						<DataTemplate>
-							<cntrollers:LyricController HorizontalAlignment="Stretch" />
-						</DataTemplate>
-					</ListView.ItemTemplate>
+					<!--  Шапка  -->
+					<Grid Padding="16,14,12,10">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="*" />
+							<ColumnDefinition Width="Auto" />
+						</Grid.ColumnDefinitions>
+						<StackPanel Spacing="2">
+							<TextBlock
+								Style="{ThemeResource BodyStrongTextBlockStyle}"
+								Text="Настройки текста" />
+							<TextBlock
+								Opacity="0.6"
+								Style="{ThemeResource CaptionTextBlockStyle}"
+								Text="Все параметры DevWinUI BetterLyric" />
+						</StackPanel>
+						<Button
+							Grid.Column="1"
+							Width="32"
+							Height="32"
+							Padding="0"
+							Click="CloseSettingsButton_Click"
+							CornerRadius="16"
+							ToolTipService.ToolTip="Свернуть настройки">
+							<FontIcon FontSize="12" Glyph="&#xE711;" />
+						</Button>
+					</Grid>
 
-				</ListView>
-			</winui:OpacityMaskView>
+					<!--  Две менюшки: Стиль и Эффекты  -->
+					<Grid Grid.Row="1" Padding="8,0,8,12">
+						<Grid.RowDefinitions>
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="*" />
+							<RowDefinition Height="Auto" />
+						</Grid.RowDefinitions>
 
-		</winui:OpacityMaskView>
-		<Grid
-			x:Name="GridBRing"
-			Grid.Row="3"
-			Padding="10"
-			HorizontalAlignment="Center"
-			VerticalAlignment="Center"
-			Background="{ThemeResource AcrylicBackgroundFillColorBaseBrush}"
-			CornerRadius="8"
-            AutomationProperties.Name="Индикатор загрузки текста песни"
-            AutomationProperties.HelpText="Отображается во время загрузки текста песни">
-			<ProgressRing
-				Grid.Row="3"
-				Width="100"
-				Height="100"
-				IsActive="True" />
+						<SelectorBar x:Name="SettingsSelector" SelectionChanged="SettingsSelector_SelectionChanged">
+							<SelectorBarItem Text="Стиль" IsSelected="True" />
+							<SelectorBarItem Text="Эффекты" />
+						</SelectorBar>
+
+						<!--  ===== МЕНЮ 1: СТИЛЬ =====  -->
+						<ScrollViewer
+							x:Name="StyleScroll"
+							Grid.Row="1"
+							Margin="8,8,8,0"
+							VerticalScrollBarVisibility="Auto">
+							<StackPanel>
+
+								<Expander Header="Разметка" Style="{StaticResource OptionGroupStyle}">
+									<StackPanel Style="{StaticResource OptionPanelStyle}">
+										<ComboBox
+											x:Name="AlignmentCombo"
+											Header="Выравнивание"
+											HorizontalAlignment="Stretch"
+											SelectionChanged="AlignmentCombo_SelectionChanged" />
+										<ComboBox
+											x:Name="OrientationCombo"
+											Header="Расположение перевода"
+											HorizontalAlignment="Stretch"
+											SelectionChanged="OrientationCombo_SelectionChanged" />
+										<ToggleSwitch
+											x:Name="AutoWrapToggle"
+											Header="Перенос длинных строк"
+											IsOn="True"
+											Toggled="AutoWrapToggle_Toggled" />
+										<Slider
+											x:Name="TopOffsetSlider"
+											Header="Позиция активной строки, %"
+											Maximum="99"
+											Minimum="1"
+											StepFrequency="1"
+											Value="45"
+											ValueChanged="TopOffsetSlider_ValueChanged" />
+										<Slider
+											x:Name="OverallSpacingSlider"
+											Header="Промежутки между строками"
+											Maximum="2"
+											Minimum="0"
+											StepFrequency="0.1"
+											Value="0.6"
+											ValueChanged="OverallSpacingSlider_ValueChanged" />
+										<Slider
+											x:Name="InnerSpacingSlider"
+											Header="Расстояние перевод ↔ оригинал"
+											Maximum="2"
+											Minimum="-2"
+											StepFrequency="0.1"
+											Value="0.1"
+											ValueChanged="InnerSpacingSlider_ValueChanged" />
+									</StackPanel>
+								</Expander>
+
+								<Expander Header="Шрифт" Style="{StaticResource OptionGroupStyle}">
+									<StackPanel Style="{StaticResource OptionPanelStyle}">
+										<ComboBox
+											x:Name="FontWeightCombo"
+											Header="Начертание"
+											HorizontalAlignment="Stretch"
+											SelectionChanged="FontWeightCombo_SelectionChanged" />
+										<Slider
+											x:Name="FontSizeSlider"
+											Header="Размер основного текста"
+											Maximum="72"
+											Minimum="10"
+											StepFrequency="1"
+											Value="24"
+											ValueChanged="FontSizeSlider_ValueChanged" />
+										<Slider
+											x:Name="TranslatedFontSizeSlider"
+											Header="Размер перевода"
+											Maximum="48"
+											Minimum="8"
+											StepFrequency="1"
+											Value="12"
+											ValueChanged="TranslatedFontSizeSlider_ValueChanged" />
+										<ToggleSwitch
+											x:Name="DynamicFontSizeToggle"
+											Header="Автоподбор размера под ширину"
+											IsOn="True"
+											Toggled="DynamicFontSizeToggle_Toggled" />
+										<Slider
+											x:Name="StrokeWidthSlider"
+											Header="Толщина обводки текста"
+											Maximum="20"
+											Minimum="0"
+											StepFrequency="1"
+											Value="0"
+											ValueChanged="StrokeWidthSlider_ValueChanged" />
+										<ToggleSwitch
+											x:Name="RtlToggle"
+											Header="Текст справа налево"
+											Toggled="RtlToggle_Toggled" />
+									</StackPanel>
+								</Expander>
+
+								<Expander Header="Прозрачность" Style="{StaticResource OptionGroupStyle}">
+									<StackPanel Style="{StaticResource OptionPanelStyle}">
+										<Slider
+											x:Name="PlayedOpacitySlider"
+											Header="Пропетая строка, %"
+											Maximum="100"
+											Minimum="0"
+											StepFrequency="5"
+											Value="100"
+											ValueChanged="PlayedOpacitySlider_ValueChanged" />
+										<Slider
+											x:Name="UnplayedOpacitySlider"
+											Header="Непропетая строка, %"
+											Maximum="100"
+											Minimum="0"
+											StepFrequency="5"
+											Value="35"
+											ValueChanged="UnplayedOpacitySlider_ValueChanged" />
+										<Slider
+											x:Name="TranslatedOpacitySlider"
+											Header="Перевод, %"
+											Maximum="100"
+											Minimum="0"
+											StepFrequency="5"
+											Value="70"
+											ValueChanged="TranslatedOpacitySlider_ValueChanged" />
+									</StackPanel>
+								</Expander>
+
+								<Expander Header="Прокрутка" Style="{StaticResource OptionGroupStyle}">
+									<StackPanel Style="{StaticResource OptionPanelStyle}">
+										<ComboBox
+											x:Name="EasingTypeCombo"
+											Header="Тип кривой"
+											HorizontalAlignment="Stretch"
+											SelectionChanged="EasingTypeCombo_SelectionChanged" />
+										<ComboBox
+											x:Name="EasingModeCombo"
+											Header="Режим кривой"
+											HorizontalAlignment="Stretch"
+											SelectionChanged="EasingModeCombo_SelectionChanged" />
+										<Slider
+											x:Name="ScrollDurationSlider"
+											Header="Длительность прокрутки, мс"
+											Maximum="1000"
+											Minimum="0"
+											StepFrequency="50"
+											Value="500"
+											ValueChanged="ScrollDurationSlider_ValueChanged" />
+										<Slider
+											x:Name="SyncThresholdSlider"
+											Header="Порог синхронизации, мс"
+											Maximum="2000"
+											Minimum="0"
+											StepFrequency="25"
+											Value="150"
+											ValueChanged="SyncThresholdSlider_ValueChanged" />
+									</StackPanel>
+								</Expander>
+
+								<Expander Header="Прочее" Style="{StaticResource OptionGroupStyle}">
+									<StackPanel Style="{StaticResource OptionPanelStyle}">
+										<ToggleSwitch
+											x:Name="ShadowToggle"
+											Header="Тень текста"
+											Toggled="ShadowToggle_Toggled" />
+										<Slider
+											x:Name="PositionOffsetSlider"
+											Header="Коррекция позиции, мс"
+											Maximum="5000"
+											Minimum="-5000"
+											StepFrequency="50"
+											Value="0"
+											ValueChanged="PositionOffsetSlider_ValueChanged" />
+										<ToggleSwitch
+											x:Name="ScrollViewerToggle"
+											Header="Прокрутка колесом"
+											IsOn="True"
+											Toggled="ScrollViewerToggle_Toggled" />
+									</StackPanel>
+								</Expander>
+
+							</StackPanel>
+						</ScrollViewer>
+
+						<!--  ===== МЕНЮ 2: ЭФФЕКТЫ =====  -->
+						<ScrollViewer
+							x:Name="EffectsScroll"
+							Grid.Row="1"
+							Margin="8,8,8,0"
+							VerticalScrollBarVisibility="Auto"
+							Visibility="Collapsed">
+							<StackPanel>
+
+								<Expander Header="Эффекты" Style="{StaticResource OptionGroupStyle}">
+									<StackPanel Style="{StaticResource OptionPanelStyle}">
+										<ComboBox
+											x:Name="WordByWordCombo"
+											Header="Режим «слово за словом»"
+											HorizontalAlignment="Stretch"
+											SelectionChanged="WordByWordCombo_SelectionChanged" />
+										<ToggleSwitch
+											x:Name="BlurToggle"
+											Header="Размытие"
+											IsOn="True"
+											Toggled="BlurToggle_Toggled" />
+										<ToggleSwitch
+											x:Name="FadeOutToggle"
+											Header="Затухание строк"
+											IsOn="True"
+											Toggled="FadeOutToggle_Toggled" />
+										<ToggleSwitch
+											x:Name="OutOfSightToggle"
+											Header="Скрытие строк вне экрана"
+											IsOn="True"
+											Toggled="OutOfSightToggle_Toggled" />
+									</StackPanel>
+								</Expander>
+
+								<Expander Header="Свечение (Glow)" Style="{StaticResource OptionGroupStyle}">
+									<StackPanel Style="{StaticResource OptionPanelStyle}">
+										<ToggleSwitch
+											x:Name="GlowToggle"
+											Header="Свечение"
+											IsOn="True"
+											Toggled="GlowToggle_Toggled" />
+										<ComboBox
+											x:Name="GlowScopeCombo"
+											Header="Область"
+											HorizontalAlignment="Stretch"
+											SelectionChanged="GlowScopeCombo_SelectionChanged" />
+										<Slider
+											x:Name="GlowLongSyllableSlider"
+											Header="Длительность длинного слога, мс"
+											Maximum="1000"
+											Minimum="0"
+											StepFrequency="50"
+											Value="700"
+											ValueChanged="GlowLongSyllableSlider_ValueChanged" />
+										<ToggleSwitch
+											x:Name="GlowAutoAmountToggle"
+											Header="Автоподбор"
+											IsOn="True"
+											Toggled="GlowAutoAmountToggle_Toggled" />
+										<Slider
+											x:Name="GlowAmountSlider"
+											Header="Интенсивность"
+											IsEnabled="{x:Bind IsGlowAmountEnabled, Mode=OneWay}"
+											Maximum="16"
+											Minimum="0"
+											StepFrequency="1"
+											Value="8"
+											ValueChanged="GlowAmountSlider_ValueChanged" />
+									</StackPanel>
+								</Expander>
+
+								<Expander Header="Масштаб" Style="{StaticResource OptionGroupStyle}">
+									<StackPanel Style="{StaticResource OptionPanelStyle}">
+										<ToggleSwitch
+											x:Name="ScaleToggle"
+											Header="Масштаб"
+											IsOn="True"
+											Toggled="ScaleToggle_Toggled" />
+										<Slider
+											x:Name="ScaleLongSyllableSlider"
+											Header="Длительность длинного слога, мс"
+											Maximum="1000"
+											Minimum="0"
+											StepFrequency="50"
+											Value="700"
+											ValueChanged="ScaleLongSyllableSlider_ValueChanged" />
+										<ToggleSwitch
+											x:Name="ScaleAutoAmountToggle"
+											Header="Автоподбор"
+											IsOn="True"
+											Toggled="ScaleAutoAmountToggle_Toggled" />
+										<Slider
+											x:Name="ScaleAmountSlider"
+											Header="Масштаб, %"
+											IsEnabled="{x:Bind IsScaleAmountEnabled, Mode=OneWay}"
+											Maximum="200"
+											Minimum="100"
+											StepFrequency="5"
+											Value="115"
+											ValueChanged="ScaleAmountSlider_ValueChanged" />
+									</StackPanel>
+								</Expander>
+
+								<Expander Header="Плавающая анимация" Style="{StaticResource OptionGroupStyle}">
+									<StackPanel Style="{StaticResource OptionPanelStyle}">
+										<ToggleSwitch
+											x:Name="FloatToggle"
+											Header="Плавающая анимация"
+											IsOn="True"
+											Toggled="FloatToggle_Toggled" />
+										<ToggleSwitch
+											x:Name="FloatAutoAmountToggle"
+											Header="Автоподбор"
+											IsOn="True"
+											Toggled="FloatAutoAmountToggle_Toggled" />
+										<Slider
+											x:Name="FloatAmountSlider"
+											Header="Амплитуда"
+											IsEnabled="{x:Bind IsFloatAmountEnabled, Mode=OneWay}"
+											Maximum="16"
+											Minimum="0"
+											StepFrequency="1"
+											Value="8"
+											ValueChanged="FloatAmountSlider_ValueChanged" />
+										<Slider
+											x:Name="FloatDurationSlider"
+											Header="Длительность, мс"
+											Maximum="2000"
+											Minimum="0"
+											StepFrequency="50"
+											Value="450"
+											ValueChanged="FloatDurationSlider_ValueChanged" />
+									</StackPanel>
+								</Expander>
+
+								<Expander Header="Веер" Style="{StaticResource OptionGroupStyle}">
+									<StackPanel Style="{StaticResource OptionPanelStyle}">
+										<ToggleSwitch
+											x:Name="FanToggle"
+											Header="Веер"
+											Toggled="FanToggle_Toggled" />
+										<Slider
+											x:Name="FanAngleSlider"
+											Header="Угол"
+											IsEnabled="{x:Bind IsFanEnabled, Mode=OneWay}"
+											Maximum="90"
+											Minimum="-90"
+											StepFrequency="5"
+											Value="30"
+											ValueChanged="FanAngleSlider_ValueChanged" />
+									</StackPanel>
+								</Expander>
+
+								<Expander Header="3D" Style="{StaticResource OptionGroupStyle}">
+									<StackPanel Style="{StaticResource OptionPanelStyle}">
+										<ToggleSwitch
+											x:Name="ThreeDToggle"
+											Header="3D текст"
+											Toggled="ThreeDToggle_Toggled" />
+										<Slider
+											x:Name="ThreeDXSlider"
+											Header="X"
+											IsEnabled="{x:Bind Is3DEnabled, Mode=OneWay}"
+											Maximum="90"
+											Minimum="-90"
+											StepFrequency="5"
+											Value="30"
+											ValueChanged="ThreeDXSlider_ValueChanged" />
+										<Slider
+											x:Name="ThreeDYSlider"
+											Header="Y"
+											IsEnabled="{x:Bind Is3DEnabled, Mode=OneWay}"
+											Maximum="90"
+											Minimum="-90"
+											StepFrequency="5"
+											Value="0"
+											ValueChanged="ThreeDYSlider_ValueChanged" />
+										<Slider
+											x:Name="ThreeDZSlider"
+											Header="Z"
+											IsEnabled="{x:Bind Is3DEnabled, Mode=OneWay}"
+											Maximum="90"
+											Minimum="-90"
+											StepFrequency="5"
+											Value="0"
+											ValueChanged="ThreeDZSlider_ValueChanged" />
+										<ToggleSwitch
+											x:Name="ThreeDAutoFitToggle"
+											Header="Автоподгонка разметки"
+											IsEnabled="{x:Bind Is3DEnabled, Mode=OneWay}"
+											Toggled="ThreeDAutoFitToggle_Toggled" />
+										<Slider
+											x:Name="ThreeDDepthSlider"
+											Header="Глубина"
+											IsEnabled="{x:Bind Is3DEnabled, Mode=OneWay}"
+											Maximum="2000"
+											Minimum="100"
+											StepFrequency="50"
+											Value="1000"
+											ValueChanged="ThreeDDepthSlider_ValueChanged" />
+									</StackPanel>
+								</Expander>
+
+								<Expander Header="Дыхание" Style="{StaticResource OptionGroupStyle}">
+									<StackPanel Style="{StaticResource OptionPanelStyle}">
+										<ToggleSwitch
+											x:Name="BreathingToggle"
+											Header="Эффект «дыхания»"
+											Toggled="BreathingToggle_Toggled" />
+										<Slider
+											x:Name="BreathingIntensitySlider"
+											Header="Интенсивность"
+											IsEnabled="{x:Bind IsBreathingEnabled, Mode=OneWay}"
+											Maximum="200"
+											Minimum="0"
+											StepFrequency="5"
+											Value="80"
+											ValueChanged="BreathingIntensitySlider_ValueChanged" />
+									</StackPanel>
+								</Expander>
+	
+								<Expander Header="Диагностика" Style="{StaticResource OptionGroupStyle}">
+									<StackPanel Style="{StaticResource OptionPanelStyle}">
+										<ToggleSwitch
+											x:Name="DebugLoggingToggle"
+											Header="Отладочные логи"
+											AutomationProperties.HelpText="Включает запись логов отрисовки, раскладки и анимаций текста песни в Output → Debug"
+											OffContent="Выкл"
+											OnContent="Вкл"
+											Toggled="DebugLoggingToggle_Toggled" />
+										<TextBlock
+											FontSize="11"
+											Opacity="0.6"
+											Style="{ThemeResource CaptionTextBlockStyle}"
+											Text="Сообщения пишутся в Output → Debug. Кнопка ниже снимает снимок состояния контрола и копирует его в буфер обмена."
+											TextWrapping="Wrap" />
+										<Button
+											x:Name="DumpStateButton"
+											HorizontalAlignment="Stretch"
+											Click="DumpStateButton_Click"
+											CornerRadius="6"
+											ToolTipService.ToolTip="Снимок состояния BetterLyric в буфер обмена">
+											<StackPanel Orientation="Horizontal" Spacing="8">
+												<FontIcon FontSize="14" Glyph="&#xE9D9;" />
+												<TextBlock VerticalAlignment="Center" Text="Скопировать состояние контрола" />
+											</StackPanel>
+										</Button>
+									</StackPanel>
+								</Expander>
+	
+							</StackPanel>
+						</ScrollViewer>
+	
+						<!--  Кнопка сброса: отдельная строка под списком настроек  -->
+						<Grid
+							Grid.Row="2"
+							Margin="8,12,8,0">
+							<Border
+								Height="1"
+								Margin="0,0,0,12"
+								VerticalAlignment="Top"
+								Background="{ThemeResource CardStrokeColorDefaultBrush}" />
+							<Button
+								Margin="0,12,0,0"
+								HorizontalAlignment="Stretch"
+								Click="ResetSettingsButton_Click"
+								CornerRadius="6"
+								ToolTipService.ToolTip="Возвращает все настройки текста к значениям по умолчанию">
+								<StackPanel Orientation="Horizontal" Spacing="8">
+									<FontIcon FontSize="14" Glyph="&#xE777;" />
+									<TextBlock VerticalAlignment="Center" Text="Сбросить к значениям по умолчанию" />
+								</StackPanel>
+							</Button>
+						</Grid>
+					</Grid>
+				</Grid>
+			</Border>
 		</Grid>
 
 		<Grid.Resources>
@@ -129,6 +732,32 @@
 					Storyboard.TargetProperty="Opacity"
 					To="0"
 					Duration="0:0:0.3" />
+			</Storyboard>
+			<Storyboard x:Name="OpenSettingsStoryboard">
+				<DoubleAnimation
+					EnableDependentAnimation="True"
+					Storyboard.TargetName="SettingsPane"
+					Storyboard.TargetProperty="Width"
+					From="0"
+					To="380"
+					Duration="0:0:0.2">
+					<DoubleAnimation.EasingFunction>
+						<CubicEase EasingMode="EaseOut" />
+					</DoubleAnimation.EasingFunction>
+				</DoubleAnimation>
+			</Storyboard>
+			<Storyboard x:Name="CloseSettingsStoryboard">
+				<DoubleAnimation
+					EnableDependentAnimation="True"
+					Storyboard.TargetName="SettingsPane"
+					Storyboard.TargetProperty="Width"
+					From="380"
+					To="0"
+					Duration="0:0:0.2">
+					<DoubleAnimation.EasingFunction>
+						<CubicEase EasingMode="EaseIn" />
+					</DoubleAnimation.EasingFunction>
+				</DoubleAnimation>
 			</Storyboard>
 		</Grid.Resources>
 	</Grid>

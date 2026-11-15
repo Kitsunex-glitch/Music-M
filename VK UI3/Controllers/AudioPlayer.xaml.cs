@@ -295,8 +295,11 @@ namespace VK_UI3.Controllers
             var muted = VK_UI3.Services.MediaPlayerService.IsMuted;
             var name = muted ? "Громкость, звук отключён" : $"Громкость, {percent} процентов";
 
-            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(VolumeButton, name);
-            ToolTipService.SetToolTip(VolumeButton, name);
+            this.DispatcherQueue.TryEnqueue(() =>
+            {
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(VolumeButton, name);
+                ToolTipService.SetToolTip(VolumeButton, name);
+            });
         }
 
         private void MediaPlayerService_PositionChanged(object sender, TimeSpan e)

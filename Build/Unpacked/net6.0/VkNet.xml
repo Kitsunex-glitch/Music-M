@@ -36270,6 +36270,46 @@
             Неизвестно (получено экспериментально).
             </summary>
         </member>
+        <member name="P:VkNet.Model.Attachments.Audio.LegalNoticesType">
+            <summary>
+            Тип правовых уведомлений.
+            </summary>
+        </member>
+        <member name="P:VkNet.Model.Attachments.Audio.Ads">
+            <summary>
+            Рекламная информация о треке.
+            </summary>
+        </member>
+        <member name="P:VkNet.Model.Attachments.Audio.AudioStreams">
+            <summary>
+            Доступные аудиопотоки трека (aac, dash, flac, hls, mp3 и т.п.).
+            </summary>
+        </member>
+        <member name="P:VkNet.Model.Attachments.Audio.Like">
+            <summary>
+            <c>true</c>, если трек отмечен "нравится".
+            </summary>
+        </member>
+        <member name="P:VkNet.Model.Attachments.Audio.TrackId">
+            <summary>
+            Идентификатор трека.
+            </summary>
+        </member>
+        <member name="P:VkNet.Model.Attachments.Audio.IsOfficial">
+            <summary>
+            <c>true</c>, если трек официальный.
+            </summary>
+        </member>
+        <member name="P:VkNet.Model.Attachments.Audio.MainColor">
+            <summary>
+            Основной цвет обложки трека (например, #FBFBFB).
+            </summary>
+        </member>
+        <member name="P:VkNet.Model.Attachments.Audio.FileId">
+            <summary>
+            Идентификатор файла.
+            </summary>
+        </member>
         <member name="M:VkNet.Model.Attachments.Audio.FromJson(VkNet.Utils.VkResponse)">
             <summary>
             Разобрать из json.
@@ -36283,6 +36323,49 @@
             </summary>
             <param name="response"> Ответ сервера. </param>
             <returns>Результат преобразования в <see cref="T:VkNet.Model.Attachments.Audio" /></returns>
+        </member>
+        <member name="T:VkNet.Model.Attachments.AudioAds">
+            <summary>
+            Рекламная информация о треке (поле <c>ads</c>).
+            </summary>
+        </member>
+        <member name="P:VkNet.Model.Attachments.AudioAds.ContentId">
+            <summary>
+            Идентификатор рекламного контента.
+            </summary>
+        </member>
+        <member name="P:VkNet.Model.Attachments.AudioAds.Duration">
+            <summary>
+            Длительность рекламной вставки в секундах.
+            </summary>
+        </member>
+        <member name="P:VkNet.Model.Attachments.AudioAds.AccountAgeType">
+            <summary>
+            Тип возраста аккаунта.
+            </summary>
+        </member>
+        <member name="P:VkNet.Model.Attachments.AudioAds.Puid1">
+            <summary>
+            Параметр puid1.
+            </summary>
+        </member>
+        <member name="P:VkNet.Model.Attachments.AudioAds.Puid22">
+            <summary>
+            Параметр puid22.
+            </summary>
+        </member>
+        <member name="M:VkNet.Model.Attachments.AudioAds.FromJson(VkNet.Utils.VkResponse)">
+            <summary>
+            Разобрать из json.
+            </summary>
+            <param name="response"> Ответ сервера. </param>
+            <returns> </returns>
+        </member>
+        <member name="M:VkNet.Model.Attachments.AudioAds.op_Implicit(VkNet.Utils.VkResponse)~VkNet.Model.Attachments.AudioAds">
+            <summary>
+            Преобразование <see cref="T:VkNet.Utils.VkResponse" /> в <see cref="T:VkNet.Model.Attachments.AudioAds" />
+            </summary>
+            <param name="response"> Ответ сервера. </param>
         </member>
         <member name="T:VkNet.Model.Attachments.AudioChartInfo">
             <summary>
@@ -36508,6 +36591,39 @@
             </summary>
             <param name="response"> Ответ сервера. </param>
             <returns> Результат преобразования в <see cref="T:VkNet.Model.Attachments.AudioPlaylist" /> </returns>
+        </member>
+        <member name="T:VkNet.Model.Attachments.AudioStream">
+            <summary>
+            Аудиопоток трека (поле <c>audio_streams</c>).
+            </summary>
+        </member>
+        <member name="P:VkNet.Model.Attachments.AudioStream.Type">
+            <summary>
+            Тип потока: aac, dash, flac, hls_range, hls_ts, mp3 и т.п.
+            </summary>
+        </member>
+        <member name="P:VkNet.Model.Attachments.AudioStream.Url">
+            <summary>
+            Ссылка на поток.
+            </summary>
+        </member>
+        <member name="P:VkNet.Model.Attachments.AudioStream.FallbackUrl">
+            <summary>
+            Резервная ссылка на поток.
+            </summary>
+        </member>
+        <member name="M:VkNet.Model.Attachments.AudioStream.FromJson(VkNet.Utils.VkResponse)">
+            <summary>
+            Разобрать из json.
+            </summary>
+            <param name="response"> Ответ сервера. </param>
+            <returns> </returns>
+        </member>
+        <member name="M:VkNet.Model.Attachments.AudioStream.op_Implicit(VkNet.Utils.VkResponse)~VkNet.Model.Attachments.AudioStream">
+            <summary>
+            Преобразование <see cref="T:VkNet.Utils.VkResponse" /> в <see cref="T:VkNet.Model.Attachments.AudioStream" />
+            </summary>
+            <param name="response"> Ответ сервера. </param>
         </member>
         <member name="T:VkNet.Model.Attachments.Call">
             <summary>

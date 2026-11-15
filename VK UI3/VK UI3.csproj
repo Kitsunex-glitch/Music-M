@@ -137,12 +137,18 @@
     </ItemGroup>
 
     <ItemGroup>
-		<CsWinRTIncludedMetadatas Include="Microsoft.Web.WebView2.Core" />
+  <CsWinRTIncludedMetadatas Include="Microsoft.Web.WebView2.Core" />
         <Page Remove="Assets\SVGs\thumbdislike.xaml" />
         <Page Remove="Assets\SVGs\thumbdislikefill.xaml" />
         <Page Remove="Controls\ListPlaylists.xaml" />
         <Page Remove="themes\icons.xaml" />
     </ItemGroup>
+
+    <!--
+        Локальная копия DevWinUI BetterLyric (MIT, https://github.com/jayfunc/BetterLyrics).
+        Файлы начинаются с `#nullable enable`; nullable-предупреждения апстрим-кода (CS86xx)
+        оставлены как есть — они не влияют на работу контрола.
+    -->
 
     <ItemGroup>
         <Content Include="icon.ico">
