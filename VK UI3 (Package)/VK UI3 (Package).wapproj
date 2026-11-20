@@ -63,7 +63,6 @@
     <CsWinRTEnabled>false</CsWinRTEnabled>
     <GenerateTestArtifacts>True</GenerateTestArtifacts>
     <AppxSymbolPackageEnabled>False</AppxSymbolPackageEnabled>
-    <AppxPackageName>Music_M_UI3</AppxPackageName>
     <PackageCertificateKeyFile>VK UI3 %28Package%29_TemporaryKey.pfx</PackageCertificateKeyFile>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
