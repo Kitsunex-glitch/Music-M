@@ -189,6 +189,14 @@ namespace VK_UI3.Views.ModalsPages
                 await LoadLyricsAsync();
             }
 
+            // Текст без таймингов: позиция плеера не подаётся в контрол,
+            // иначе полотно уедет к случайной строке.
+            if (IsUntimedMode)
+            {
+                LyricsView.CurrentIsPlaying = false;
+                return;
+            }
+
             var mediaPlayer = VK_UI3.Services.MediaPlayerService.MediaPlayer;
             if (mediaPlayer == null)
                 return;
@@ -432,10 +440,24 @@ namespace VK_UI3.Views.ModalsPages
                 BetterLyricDebugLog.WriteAlways(
                     BetterLyricLogCategory.Data,
                     $"ApplyLyricsData: строк={data.LyricsLines.Count}, wordByWord={data.IsWordByWord}, " +
-                    $"duration={data.Duration.TotalSeconds:0.##} с, UI-поток={DispatcherQueue.HasThreadAccess}");
+                    $"untimed={data.IsUntimed}, duration={data.Duration.TotalSeconds:0.##} с, " +
+                    $"UI-поток={DispatcherQueue.HasThreadAccess}");
 
-                LyricsView.CurrentLyricsData = data;
-                LyricsView.CurrentPosition = VK_UI3.Services.MediaPlayerService.MediaPlayer?.Position ?? TimeSpan.Zero;
+                if (data.IsUntimed)
+                {
+                    // Текст без таймингов: позиция плеера не подаётся в контрол, иначе
+                    // синхронизатор подсветит случайную строку и полотно уедет к ней.
+                    ApplyUntimedEffectProfile();
+                    LyricsView.CurrentLyricsData = data;
+                    LyricsView.CurrentPosition = TimeSpan.Zero;
+                    LyricsView.CurrentIsPlaying = false;
+                }
+                else
+                {
+                    RestoreTimedEffectProfile();
+                    LyricsView.CurrentLyricsData = data;
+                    LyricsView.CurrentPosition = VK_UI3.Services.MediaPlayerService.MediaPlayer?.Position ?? TimeSpan.Zero;
+                }
             }
 
             if (DispatcherQueue.HasThreadAccess)
@@ -443,6 +465,59 @@ namespace VK_UI3.Views.ModalsPages
             else
                 DispatcherQueue.TryEnqueue(Apply);
         }
+
+        /// <summary>
+        /// Статичный профиль для текста без таймингов: текст просто читается,
+        /// без посимвольных эффектов и без подсветки «играющей» строки.
+        /// </summary>
+        private void ApplyUntimedEffectProfile()
+        {
+            if (_isUntimedProfileApplied)
+                return;
+
+            _isUntimedProfileApplied = true;
+
+            var v = LyricsView;
+            v.WordByWordEffectMode = LyricsWordByWordEffectMode.Never;
+            v.IsLyricsGlowEffectEnabled = false;
+            v.IsLyricsScaleEffectEnabled = false;
+            v.IsLyricsFloatAnimationEnabled = false;
+            v.IsLyricsBlurEffectEnabled = false;
+            v.IsLyricsOutOfSightEffectEnabled = false;
+            v.IsLyricsBrethingEffectEnabled = false;
+            v.Is3DLyricsEnabled = false;
+            v.IsFanLyricsEnabled = false;
+            // Плавное появление/исчезание строк оставляем — оно не зависит от таймингов.
+            v.IsLyricsFadeOutEffectEnabled = true;
+
+            BetterLyricDebugLog.WriteAlways(
+                BetterLyricLogCategory.Data,
+                "Untimed: применён статичный профиль эффектов");
+        }
+
+        /// <summary>
+        /// Возврат к пользовательским настройкам оформления после статичного текста.
+        /// Настройки в БД не трогаются — они применяются заново из сохранённых значений.
+        /// </summary>
+        private void RestoreTimedEffectProfile()
+        {
+            if (!_isUntimedProfileApplied)
+                return;
+
+            _isUntimedProfileApplied = false;
+
+            ApplySavedSettings(force: true);
+
+            BetterLyricDebugLog.WriteAlways(
+                BetterLyricLogCategory.Data,
+                "Untimed: восстановлен пользовательский профиль эффектов");
+        }
+
+        /// <summary>Признак того, что к контролу применён статичный (untimed) профиль.</summary>
+        private bool _isUntimedProfileApplied;
+
+        /// <summary>Текущий текст отображается без таймингов.</summary>
+        private bool IsUntimedMode => _lyricsData?.IsUntimed == true;
 
         #endregion
 
@@ -840,7 +915,19 @@ namespace VK_UI3.Views.ModalsPages
             return segments;
         }
 
-        /// <summary>Текст без таймингов: равномерно распределяем по длительности трека.</summary>
+        /// <summary>
+        /// Текст без таймингов: строки отображаются статично (без синхронизации с плеером).
+        /// <para>
+        /// Каждая строка получает ровно один слог на весь текст строки. Без слога
+        /// <see cref="RenderLyricsLine"/> не создаёт ни одного символа: строка не попадает
+        /// в раскладку и не рисуется вовсе — именно из-за этого раньше «пропадал» текст
+        /// из Genius/LRCLib без LRC.
+        /// </para>
+        /// <para>
+        /// Тайминги строк условные (нужны только как границы для раскладки) — режим
+        /// <see cref="LyricData.IsUntimed"/> отключает привязку к позиции воспроизведения.
+        /// </para>
+        /// </summary>
         private static LyricData BuildUntimedLyricData(IReadOnlyList<string> lines)
         {
             var result = new List<LyricLine>(lines.Count);
@@ -855,19 +942,30 @@ namespace VK_UI3.Views.ModalsPages
             {
                 var start = i * perLine;
                 var end = start + perLine;
+                var text = lines[i] ?? string.Empty;
 
                 result.Add(new LyricLine
                 {
                     StartMs = start,
                     EndMs = end,
-                    PrimaryText = lines[i],
-                    // Для текста без синхронизации слоги не задаём — нет эффекта «слово за словом»
-                    PrimarySyllables = new List<BaseLyric>(),
+                    PrimaryText = text,
+                    // Один слог на всю строку: контрол раскладывает символы только внутри слога.
+                    PrimarySyllables = new List<BaseLyric>
+                    {
+                        new BaseLyric
+                        {
+                            Text = text,
+                            StartMs = start,
+                            EndMs = end,
+                            StartIndex = 0
+                        }
+                    },
+                    // Реального посимвольного тайминга нет — эффект «слово за словом» отключается.
                     IsPrimaryHasRealSyllableInfo = false
                 });
             }
 
-            return new LyricData(result);
+            return LyricData.CreateUntimed(result);
         }
 
         private static List<string> ParsePlainLyrics(string plainText)
@@ -1958,6 +2056,10 @@ namespace VK_UI3.Views.ModalsPages
         private void LyricsView_LineClicked(object sender, int lineIndex)
         {
             if (_lyricsData == null || lineIndex < 0 || lineIndex >= _lyricsData.LyricsLines.Count)
+                return;
+
+            // Текст без таймингов: строки не привязаны к времени — перематывать некуда.
+            if (_lyricsData.IsUntimed)
                 return;
 
             var line = _lyricsData.LyricsLines[lineIndex];
