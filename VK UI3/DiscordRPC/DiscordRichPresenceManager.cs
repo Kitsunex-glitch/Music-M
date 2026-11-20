@@ -283,7 +283,7 @@ namespace VK_UI3.DiscordRPC
 
                 // Не даём End уйти в прошлое: если позиция уже за длительностью,
                 // оставляем End = null (трек «закончился»).
-                TimeSpan? endTimestamp = null;
+                DateTime? endTimestamp = null;
                 if (duration > TimeSpan.Zero)
                 {
                     var remaining = duration - position;
