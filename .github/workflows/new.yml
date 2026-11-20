@@ -660,24 +660,65 @@ jobs:
         if: steps.check_release.outputs.exists == 'false'
 
       - name: Отправить сообщение в Telegram
+        if: steps.check_release.outputs.exists == 'false'
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        shell: pwsh
         run: |
-          $version = "${{ needs.prepare.outputs.VERSION }}"
+          $version    = "${{ needs.prepare.outputs.VERSION }}"
           $releaseUrl = "https://github.com/${{ github.repository }}/releases/tag/$version"
+          $namevers   = "${{ github.event.inputs.namevers }}"
+          $descr      = "${{ github.event.inputs.descr }}"
+
           $message = @"
-          <b>🎉 Новый релиз:</b> ${{ github.event.inputs.namevers }}
+          <b>🎉 Новый релиз:</b> $namevers
           <b>📦 Версия:</b> $version
-          <b>📝 Описание:</b> ${{ github.event.inputs.descr }}
+          <b>📝 Описание:</b> $descr
           <b>🔗 <a href='$releaseUrl'>Ссылка на релиз</a></b>
           "@
-          $uri = 'https://api.telegram.org/bot' + '${{ secrets.TELEGRAM_BOT_TOKEN }}' + '/sendMessage'
+
+          # Собираем JSON через ConvertTo-Json (корректное экранирование кавычек/переносов)
           $body = @{
-              chat_id = '${{ secrets.TELEGRAM_CHAT_ID }}'
-              text = $message
+              chat_id    = $env:TELEGRAM_CHAT_ID
+              text       = $message
               parse_mode = 'HTML'
+              disable_web_page_preview = $true
           }
-          $bodyJson = $body | ConvertTo-Json -Compress
-          Invoke-RestMethod -Uri $uri -Method Post -Body $bodyJson -ContentType 'application/json'
-        if: steps.check_release.outputs.exists == 'false'
+          $bodyJson = $body | ConvertTo-Json -Compress -Depth 5
+
+          # Пишем payload в файл (UTF-8 без BOM) — curl корректно отправит кириллицу
+          $payloadPath = Join-Path $env:RUNNER_TEMP 'tg_payload.json'
+          [System.IO.File]::WriteAllText($payloadPath, $bodyJson, [System.Text.UTF8Encoding]::new($false))
+
+          $uri = "https://api.telegram.org/bot$($env:TELEGRAM_BOT_TOKEN)/sendMessage"
+
+          # Диагностика (не падает, просто пишет в лог)
+          try {
+            $t = Test-NetConnection -ComputerName 'api.telegram.org' -Port 443 -WarningAction SilentlyContinue
+            Write-Host "TCP api.telegram.org:443 -> $($t.TcpTestSucceeded)"
+          } catch { Write-Host "Test-NetConnection недоступен: $_" }
+
+          # Формируем аргументы curl
+          $curlArgs = @(
+            '-sS', '--fail-with-body',
+            '--max-time', '30',
+            '--retry', '3', '--retry-delay', '3', '--retry-all-errors',
+            '-X', 'POST', $uri,
+            '-H', 'Content-Type: application/json',
+            '--data-binary', "@$payloadPath"
+          )
+          if ($env:TELEGRAM_PROXY) {
+            $curlArgs = @('-x', $env:TELEGRAM_PROXY) + $curlArgs
+            Write-Host "Используется прокси: $env:TELEGRAM_PROXY"
+          }
+
+          # Маскируем токен в логах на всякий случай
+          Write-Host "::add-mask::$env:TELEGRAM_BOT_TOKEN"
+
+          & curl.exe @curlArgs
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "curl завершился с кодом $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
+          Write-Host "Сообщение отправлено."
