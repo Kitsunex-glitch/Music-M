@@ -246,6 +246,12 @@ namespace VK_UI3.Services
 
         private static void MediaPlayer_MediaOpened(Windows.Media.Playback.MediaPlayer sender, object args)
         {
+            // Диагностика «отваливания» событий: по этим строкам видно, доходит ли
+            // открытие трека до плеера после серии переключений в миксе.
+            System.Diagnostics.Debug.WriteLine(
+                $"[PlayerDiag] MediaOpened gen={_loadGeneration}, track='{PlayingTrack?.audio?.Title}', " +
+                $"source={(sender.Source == null ? "null" : sender.Source.GetType().Name)}");
+
             // Update track duration when a new track is loaded
             if (PlayingTrack?.audio?.Duration > 0)
             {
@@ -282,6 +288,11 @@ namespace VK_UI3.Services
 
         private static void MediaPlayer_SourceChanged(Windows.Media.Playback.MediaPlayer sender, object args)
         {
+            System.Diagnostics.Debug.WriteLine(
+                $"[PlayerDiag] SourceChanged gen={_loadGeneration}, " +
+                $"source={(sender.Source == null ? "null" : sender.Source.GetType().Name)}, " +
+                $"track='{PlayingTrack?.audio?.Title}'");
+
             // Обновить отображение текущего трека
             if (PlayingTrack != null)
             {
@@ -689,32 +700,43 @@ namespace VK_UI3.Services
 
         private static readonly SemaphoreSlim _playTrackSemaphore = new SemaphoreSlim(1, 1);
 
+        /// <summary>
+        /// Номер текущей попытки загрузки трека. Каждый новый PlayTrack увеличивает его;
+        /// устаревшие загрузки видят чужое поколение и молча завершаются.
+        /// Раньше вместо этого делался <c>CancellationTokenSource.Dispose()</c> прямо
+        /// в момент работы предыдущей загрузки — это гонка, из-за которой в миксе
+        /// следующая песня не грузилась вовсе.
+        /// </summary>
+        private static int _loadGeneration;
+
         private async static Task PlayTrack(long? v = 0, TimeSpan? position = null)
         {
-            // Ограничиваем количество одновременных вызовов PlayTrack
-            if (!await _playTrackSemaphore.WaitAsync(TimeSpan.FromMilliseconds(500)))
-            {
-                System.Diagnostics.Debug.WriteLine("[TrackSwitch] PlayTrack semaphore timeout");
-                return;
-            }
+            // Ждём очередь, а не отказываем: отказ терял трек, потому что
+            // PlayNextTrack() уже успевал сдвинуть currentTrack.
+            await _playTrackSemaphore.WaitAsync();
 
             try
             {
                 if (iVKGetAudio == null)
                     return;
 
-                _tokenSource?.Cancel();
-                _tokenSource?.Dispose();
+                int generation = ++_loadGeneration;
+
+                // Отменяем ТОЛЬКО токен (без Dispose — он освобождается после выхода из метода),
+                // чтобы активная загрузка не упала с ObjectDisposedException.
+                try { _tokenSource?.Cancel(); } catch { }
                 _tokenSource = new();
 
                 // Отменяем предзагрузку предыдущего следующего трека
-                _nextTrackTokenSource?.Cancel();
-                _nextTrackTokenSource?.Dispose();
+                try { _nextTrackTokenSource?.Cancel(); } catch { }
                 _nextTrack = null;
                 _mediaPlayer.Position = new TimeSpan(0);
                 _mediaPlayer.Source = null;
 
                 await EnsureTrackListLoaded();
+
+                if (generation != _loadGeneration)
+                    return;
 
                 if (iVKGetAudio.listAudio.Count == 0) return;
 
@@ -723,6 +745,9 @@ namespace VK_UI3.Services
 
                 var trackdata = await _TrackDataThisGet(true);
                 if (trackdata == null)
+                    return;
+
+                if (generation != _loadGeneration)
                     return;
 
                 SendPlaybackStatistics(trackdata);
@@ -967,34 +992,78 @@ namespace VK_UI3.Services
             }
         }
 
+        /// <summary>
+        /// Открывает трек через первый рабочий источник.
+        /// <para>
+        /// ВАЖНО: источники пробуются ПОСЛЕДОВАТЕЛЬНО. Раньше они запускались
+        /// одновременно через Task.WhenAll, и каждый в своём потоке выставлял
+        /// MediaPlayer.Source. Побеждал последний, а его объекты освобождались
+        /// обработчиком SourceChanged другого источника — из-за этого в миксе
+        /// «отваливались» события и переставали грузиться следующие треки.
+        /// </para>
+        /// </summary>
         private static async Task LoadWithMediaSources(ExtendedAudio trackdata)
         {
             System.Diagnostics.Debug.WriteLine($"[MemoryLeakDebug] LoadWithMediaSources started for track: {trackdata.audio.Title}");
-            var allSourcesTask = Task.WhenAll(_mediaSources.Select(b =>
-                b.OpenWithMediaPlayerAsync(_mediaPlayer, trackdata.audio, _tokenSource.Token, equalizer: _equalizer)));
 
-            try
+            var token = _tokenSource?.Token ?? CancellationToken.None;
+            var generation = _loadGeneration;
+
+            bool anySucceeded = false;
+            string lastError = null;
+
+            foreach (var source in _mediaSources)
             {
-                await allSourcesTask;
-                System.Diagnostics.Debug.WriteLine($"[MemoryLeakDebug] LoadWithMediaSources completed for track: {trackdata.audio.Title}");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[MemoryLeakDebug] LoadWithMediaSources failed for track: {trackdata.audio.Title}: {ex.Message}");
-                if (allSourcesTask.IsCanceled ||
-                    allSourcesTask.Exception?.InnerExceptions.All(b => b is OperationCanceledException) is true)
+                // Пока шли попытки, пользователь мог переключить трек — прекращаем.
+                if (token.IsCancellationRequested || generation != _loadGeneration)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[MemoryLeakDebug] LoadWithMediaSources cancelled for track: {trackdata.audio.Title}");
                     return;
+                }
 
-                // Не пробрасываем исключение — приложение не должно падать
-                return;
+                try
+                {
+                    var opened = await source.OpenWithMediaPlayerAsync(
+                        _mediaPlayer, trackdata.audio, token, equalizer: _equalizer);
+
+                    if (opened)
+                    {
+                        anySucceeded = true;
+                        break;
+                    }
+
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[MemoryLeakDebug] Source {source.GetType().Name} returned false for track: {trackdata.audio.Title}");
+                }
+                catch (OperationCanceledException)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[MemoryLeakDebug] Source {source.GetType().Name} cancelled for track: {trackdata.audio.Title}");
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    lastError = $"{source.GetType().Name}: {ex.Message}";
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[MemoryLeakDebug] Source {source.GetType().Name} failed for track: {trackdata.audio.Title}: {ex.Message}");
+                }
             }
 
-            if (!allSourcesTask.Result.Any(b => b))
+            if (anySucceeded)
             {
-                System.Diagnostics.Debug.WriteLine($"[MemoryLeakDebug] No sources succeeded for track: {trackdata.audio.Title}");
-                PlayNextTrack();
+                System.Diagnostics.Debug.WriteLine($"[MemoryLeakDebug] LoadWithMediaSources completed for track: {trackdata.audio.Title}");
                 return;
             }
+
+            // Все источники отказали. Если трек уже сменился — просто выходим.
+            if (generation != _loadGeneration || token.IsCancellationRequested)
+                return;
+
+            System.Diagnostics.Debug.WriteLine(
+                $"[MemoryLeakDebug] No sources succeeded for track: {trackdata.audio.Title} ({lastError})");
+
+            PlayNextTrack();
         }
 
         private static void LoadBasicMediaItem(ExtendedAudio trackdata, MediaPlaybackItem mediaPlaybackItem)

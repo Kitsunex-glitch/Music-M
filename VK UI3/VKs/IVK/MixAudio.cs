@@ -285,10 +285,13 @@ namespace VK_UI3.VKs.IVK
                 var currentAppend = append;
                 Console.WriteLine($"Запрос треков: append={currentAppend}, всего загружено: {totalLoadedTracks}");
 
-                // Запрашиваем треки с текущим значением append
+                // Запрашиваем треки с ТЕКУЩИМ значением append.
+                // Раньше здесь был хардкод 1: каждый вызов отдавал одну и ту же вторую
+                // страницу микса, из-за чего появлялись дубликаты и пустые ответы,
+                // а после сброса append треки шли не по порядку.
                 var tracks = await VK.vkService.GetStreamMixAudios(
                     data.Id,
-                    1,
+                    currentAppend,
                     50,
                     options: data.Options,
                     data.PromptEvents,

@@ -626,15 +626,30 @@ public abstract class MediaSourceBase : ITrackMediaSource
         }).AsTask(cancellationToken);
     }
 
+    /// <summary>
+    /// Держит ссылку на источник (FFmpeg) до смены источника плеера.
+    /// <para>
+    /// ВАЖНО: подписка на <see cref="MediaPlayer.SourceChanged"/> должна быть ровно одна
+    /// на источник. Раньше каждый вызов подписывал новый обработчик, а отписывался он
+    /// только при следующей смене источника — при быстрой смене треков (микс) обработчики
+    /// накапливались и освобождали чужие (ещё используемые) объекты, из-за чего
+    /// воспроизведение «отваливалось».
+    /// </para>
+    /// </summary>
     protected static void RegisterSourceObjectReference(MediaPlayer player, IWinRTObject rtObject)
     {
         Debug.WriteLine("[FFMedia] Registering source object reference");
         GC.SuppressFinalize(rtObject.NativeObject);
 
-        player.SourceChanged += PlayerOnSourceChanged;
+        // Флаг нужен, чтобы освободить объект ровно один раз:
+        // подписка снимается при первом же SourceChanged либо при Dispose плеера.
+        int disposed = 0;
 
         void PlayerOnSourceChanged(MediaPlayer sender, object args)
         {
+            if (Interlocked.Exchange(ref disposed, 1) == 1)
+                return;
+
             Debug.WriteLine("[FFMedia] Player source changed, disposing rtObject");
             player.SourceChanged -= PlayerOnSourceChanged;
 
@@ -649,5 +664,7 @@ public abstract class MediaSourceBase : ITrackMediaSource
                 Debug.WriteLine("[FFMedia] rtObject re-registered for finalization");
             }
         }
+
+        player.SourceChanged += PlayerOnSourceChanged;
     }
 }
