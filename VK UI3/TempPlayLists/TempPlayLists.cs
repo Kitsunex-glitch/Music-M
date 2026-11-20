@@ -40,28 +40,54 @@ namespace VK_UI3.TempPlayLists
 
         private static async Task LoadMorePlaylistsAsync()
         {
-            if (_audioPlaylists.Count >= MaxCount || isAllLoaded) return;
-
-            var playlists = await VK.api.Audio.GetPlaylistsAsync(AccountsDB.activeAccount.id, RequestOffset, offset);
-
-            offset += RequestOffset;
-
-            foreach (var playlist in playlists)
+            // Цикл вместо рекурсии: пустые страницы больше не могут увести
+            // метод в бесконечный вызов самого себя.
+            while (!isAllLoaded && _audioPlaylists.Count < MaxCount)
             {
-                if (!playlist.Permissions.Edit) continue;
+                var requestOffset = offset;
 
-                _audioPlaylists.Add(playlist);
-                if (_audioPlaylists.Count >= MaxCount) break;
-            }
+                VkNet.Utils.VkCollection<AudioPlaylist> playlists;
+                try
+                {
+                    playlists = await VK.api.Audio.GetPlaylistsAsync(
+                        AccountsDB.activeAccount.id, RequestOffset, requestOffset);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[TempPlayLists] ошибка загрузки (offset={requestOffset}): {ex.GetType().Name}: {ex.Message}");
+                    isAllLoaded = true;
+                    break;
+                }
 
-            if (playlists.Count < RequestOffset)
-            {
-                isAllLoaded = true;
-            }
+                int received = playlists?.Count ?? 0;
 
-            if (!isAllLoaded)
-            {
-                await LoadMorePlaylistsAsync();
+                // Offset двигаем на реально полученное количество, а не на размер запроса:
+                // иначе при короткой странице часть списка пропускается.
+                offset += (uint)received;
+
+                foreach (var playlist in playlists)
+                {
+                    if (!playlist.Permissions.Edit) continue;
+
+                    _audioPlaylists.Add(playlist);
+                    if (_audioPlaylists.Count >= MaxCount) break;
+                }
+
+                System.Diagnostics.Debug.WriteLine(
+                    $"[TempPlayLists] requestOffset={requestOffset}, получено={received}, " +
+                    $"в списке={_audioPlaylists.Count}, nextOffset={offset}");
+
+                if (received < RequestOffset)
+                {
+                    isAllLoaded = true;
+                }
+
+                // Пустая страница — дальше запрашивать нечего.
+                if (received == 0)
+                {
+                    isAllLoaded = true;
+                }
             }
         }
     }

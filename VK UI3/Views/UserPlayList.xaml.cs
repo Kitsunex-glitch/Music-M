@@ -171,59 +171,135 @@ namespace VK_UI3.Views
             }
         }
 
+        /// <summary>
+        /// Ключи уже показанных плейлистов — защита от дублей при повторных запросах
+        /// (VK может отдать тот же плейлист на соседних страницах пагинации).
+        /// </summary>
+        private readonly HashSet<(long OwnerId, long Id)> _addedPlaylists = new();
+
         void addToList(VkCollection<AudioPlaylist> VKaudioPlaylists)
         {
-            audioPlaylists.AddRange(VKaudioPlaylists.Where(item =>
+            int added = 0;
+            int filteredOut = 0;
+            int duplicates = 0;
+
+            foreach (var item in VKaudioPlaylists)
             {
                 bool isUserPlaylist = item.OwnerId == AccountsDB.activeAccount.id && item.Original == null;
-                return parameters.openedPlayList switch
+                bool isVisible = parameters.openedPlayList switch
                 {
                     OpenedPlayList.all => true,
                     OpenedPlayList.UserPlayList => isUserPlaylist,
                     OpenedPlayList.UserAlbums => !isUserPlaylist,
                     _ => false
                 };
-            }));
+
+                if (!isVisible)
+                {
+                    filteredOut++;
+                    continue;
+                }
+
+                if (!_addedPlaylists.Add((item.OwnerId, item.Id)))
+                {
+                    duplicates++;
+                    continue;
+                }
+
+                audioPlaylists.Add(item);
+                added++;
+            }
+
+            System.Diagnostics.Debug.WriteLine(
+                $"[UserPlayList] addToList: получено={VKaudioPlaylists.Count}, добавлено={added}, " +
+                $"отфильтровано={filteredOut}, дублей={duplicates}, всего в списке={audioPlaylists.Count}, " +
+                $"offset={parameters.offset}, loadedAll={parameters.LoadedAll}");
         }
 
 
 
         bool nowLoaded = false;
 
+        /// <summary>Размер страницы пагинации плейлистов.</summary>
+        private const int PlaylistsPageSize = 100;
+
+        /// <summary>Сколько страниц максимум догружаем за один заход, пока экран не заполнится.</summary>
+        private const int MaxAutoFillPages = 20;
+
         internal EventHandler selectedPlayList;
+
+        /// <summary>
+        /// Догружает следующую страницу плейлистов.
+        /// <para>
+        /// offset увеличивается на реально полученное количество ДО фильтрации —
+        /// иначе отфильтрованные записи (чужие альбомы, оригиналы) съедали бы часть
+        /// страницы, и часть плейлистов пользователя никогда не запрашивалась.
+        /// </para>
+        /// </summary>
         private async Task loadMoreAsync()
         {
+            if (nowLoaded)
+                return;
+
+            if (parameters == null)
+                parameters = new UserPlayListParameters();
+
+            if (parameters.UserId == null)
+                parameters.UserId = AccountsDB.activeAccount.id;
+
+            if (parameters.LoadedAll)
+                return;
+
+            nowLoaded = true;
+
             try
             {
-                if (nowLoaded)
-                    return;
-                if (parameters.UserId == null)
-                    parameters.UserId = AccountsDB.activeAccount.id;
-                if (parameters.LoadedAll)
-                    return;
-                LoadingIndicator.IsActive = true;
-
-
-                nowLoaded = true;
-
-                var a = await VK.api.Audio.GetPlaylistsAsync((long)parameters.UserId, 100, parameters.offset);
-                parameters.offset += (uint)a.Count();
-
-                addToList(a);
-                LoadingIndicator.IsActive = false;
-                if (a.Count != 100)
+                for (int page = 0; page < MaxAutoFillPages; page++)
                 {
-                    parameters.LoadedAll = true;
-                    LoadingIndicator.Visibility = Visibility.Collapsed;
+                    if (parameters.LoadedAll)
+                        break;
+
+                    var requestOffset = parameters.offset;
+                    var response = await VK.api.Audio.GetPlaylistsAsync(
+                        (long)parameters.UserId, PlaylistsPageSize, requestOffset);
+
+                    int received = response?.Count ?? 0;
+
+                    // Offset двигаем на сырое количество, а не на количество после фильтра.
+                    parameters.offset += (uint)received;
+
+                    if (received > 0)
+                        addToList(response);
+
+                    // Признак конца списка — только по сырому ответу API.
+                    if (received < PlaylistsPageSize)
+                    {
+                        parameters.LoadedAll = true;
+                        LoadingIndicator.Visibility = Visibility.Collapsed;
+                    }
+
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[UserPlayList] страница: requestOffset={requestOffset}, получено={received}, " +
+                        $"nextOffset={parameters.offset}, loadedAll={parameters.LoadedAll}");
+
+                    if (received == 0)
+                        break;
+
+                    // Экран ещё не заполнен — догружаем следующую страницу.
+                    if (parameters.LoadedAll || !CheckIfAllContentIsVisible(scrollViewer))
+                        break;
                 }
             }
-            catch { }
-
-            nowLoaded = false;
-
-            if (CheckIfAllContentIsVisible(scrollViewer))
+            catch (Exception ex)
             {
-                loadMoreAsync();
+                System.Diagnostics.Debug.WriteLine(
+                    $"[UserPlayList] ошибка загрузки плейлистов (offset={parameters.offset}): " +
+                    $"{ex.GetType().Name}: {ex.Message}");
+            }
+            finally
+            {
+                LoadingIndicator.IsActive = false;
+                nowLoaded = false;
             }
         }
 
