@@ -1,6 +1,7 @@
 ﻿using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Navigation;
 using System;
+using System.Threading.Tasks;
 using VK_UI3.DB;
 using VK_UI3.VKs;
 using VkNet.AudioBypassService.Models.Auth;
@@ -108,7 +109,9 @@ namespace VK_UI3.Views.LoginWindow
 
         private void sumbit()
         {
-            vk.Vk2FaCompleteAsync(CodeBox.Text);
+            // Код проверяется в фоне: ошибка вернётся сюда через SendArgs,
+            // а не потеряется в необработанном исключении.
+            _ = vk.Vk2FaCompleteAsync(CodeBox.Text);
 
         }
 
@@ -129,6 +132,35 @@ namespace VK_UI3.Views.LoginWindow
 
         public void SendArgs(ArgSender argSender)
         {
+            // Раньше метод был пустым: ошибка входа на этой странице никак не показывалась.
+            if (argSender == null || string.IsNullOrEmpty(argSender.ErrorText))
+                return;
+
+            System.Diagnostics.Debug.WriteLine($"[OtpCode] Ошибка: {argSender.ErrorText}");
+
+            // Своего блока ошибки на странице нет — показываем диалог,
+            // чтобы пользователь не остался без обратной связи.
+            _ = ShowErrorAsync(argSender.ErrorText);
+        }
+
+        private async Task ShowErrorAsync(string message)
+        {
+            try
+            {
+                var dialog = new Microsoft.UI.Xaml.Controls.ContentDialog
+                {
+                    XamlRoot = this.XamlRoot,
+                    Title = "Ошибка входа",
+                    Content = message,
+                    CloseButtonText = "Ок"
+                };
+
+                await dialog.ShowAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[OtpCode] Не удалось показать ошибку: {ex.Message}");
+            }
         }
     }
 }

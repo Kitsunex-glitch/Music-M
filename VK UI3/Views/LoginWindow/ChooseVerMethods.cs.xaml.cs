@@ -1,6 +1,7 @@
 ﻿using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
+using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Threading.Tasks;
@@ -61,8 +62,19 @@ namespace VK_UI3.Views.LoginWindow
 
         private async void BackButton(object sender, RoutedEventArgs e)
         {
-            // _ = await InputTextDialogAsync("hello!", this.XamlRoot);
-            this.Frame.GoBack();
+            // Раньше GoBack() вызывался без ArgSender: пользователь попадал на страницу,
+            // которая не умеет показывать ошибку, и мог застрять на ней.
+            try
+            {
+                if (this.Frame is ExtendFrame extendFrame)
+                    extendFrame.GoBack(new ArgSender { ErrorText = "Выбор способа входа отменён" });
+                else
+                    this.Frame.GoBack();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ChooseVerMethods] Ошибка возврата: {ex.Message}");
+            }
         }
 
         private void LoginsListView_SelectionChanged(object sender, SelectionChangedEventArgs e)

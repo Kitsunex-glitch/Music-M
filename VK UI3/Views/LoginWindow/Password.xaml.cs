@@ -96,7 +96,9 @@ namespace VK_UI3.Views.LoginWindow
 
         private void ShowAnotherVerificationMethodsButton_Click(object sender, RoutedEventArgs e)
         {
-            Submitted.SetResult(null);
+            // TrySetResult: Submitted может быть уже завершён (например, повторный клик),
+            // и SetResult в этом случае выбрасывал InvalidOperationException.
+            Submitted.TrySetResult(null);
             Submitted = new TaskCompletionSource<string?>();
         }
 

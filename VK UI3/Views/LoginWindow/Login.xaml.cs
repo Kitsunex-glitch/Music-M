@@ -62,19 +62,23 @@ namespace VK_UI3.Views.LoginWindow
 
 
 
-        private async void LoginButton_Click(object sender, RoutedEventArgs e)
+        private void LoginButton_Click(object sender, RoutedEventArgs e)
         {
-            
+            StartLogin();
+        }
 
-            Task task = new Task(() =>
-            {
-                loginInvike();
-            });
-            task.RunSynchronously();
+        /// <summary>
+        /// Запускает авторизацию и переводит на страницу ожидания.
+        /// <para>
+        /// Раньше здесь был <c>new Task(...).RunSynchronously()</c> вокруг метода,
+        /// который запускал <c>async void LoginAsync</c>: исключения терялись, а
+        /// пользователь мог навсегда остаться на странице ожидания.
+        /// </para>
+        /// </summary>
+        private void StartLogin()
+        {
+            loginInvike();
             Frame.Navigate(typeof(waitPage), this, new DrillInNavigationTransitionInfo());
-
-
-
         }
 
         private void loginInvike()
@@ -100,7 +104,9 @@ namespace VK_UI3.Views.LoginWindow
             }
             catch { }
 
-            new VKAuth(this).LoginAsync(LoginTextBox.Text);
+            // LoginAsync сам сообщает об ошибке через GoBack(ArgSender) — результат не наблюдаем,
+            // но исключения внутри него обработаны.
+            _ = new VKAuth(this).LoginAsync(LoginTextBox.Text);
         }
 
         public Task<string> InputTextDialogAsyncCapthca(Uri imageUrl)
@@ -285,13 +291,7 @@ namespace VK_UI3.Views.LoginWindow
         {
             if (e.Key == Windows.System.VirtualKey.Enter)
             {
-                Task task = new Task(() =>
-                {
-                    loginInvike();
-
-                });
-                task.RunSynchronously();
-                Frame.Navigate(typeof(waitPage), this, new DrillInNavigationTransitionInfo());
+                StartLogin();
             }
         }
 

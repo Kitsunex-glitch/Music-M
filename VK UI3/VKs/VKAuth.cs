@@ -113,12 +113,48 @@ namespace VK_UI3.VKs
 
         private AndroidGrantType _grantType = AndroidGrantType.Password;
 
+        /// <summary>
+        /// Возвращает пользователя на страницу входа с текстом ошибки.
+        /// <para>
+        /// Раньше ошибка обрабатывалась двумя путями одновременно (GoBack + throw),
+        /// из-за чего в UI ничего не приходило, а пользователь оставался на странице
+        /// ожидания. Теперь исход всегда один — сообщение об ошибке.
+        /// </para>
+        /// </summary>
+        private void FailToLogin(string? message)
+        {
+            try
+            {
+                if (login?.Frame is ExtendFrame frame)
+                {
+                    frame.GoBack(new ArgSender { ErrorText = message ?? "Не удалось выполнить вход" });
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[VKAuth] Не удалось вернуться на страницу входа: {ex.Message}");
+            }
+
+            try
+            {
+                login?.Frame?.Navigate(typeof(Login));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[VKAuth] Не удалось открыть страницу входа: {ex.Message}");
+            }
+        }
+
         public async Task LoginAsync(string? arg)
         {
             try
             {
                 if (string.IsNullOrEmpty(arg))
+                {
+                    FailToLogin("Введите логин");
                     return;
+                }
 
 
                 if (AccountsDB.activeAccount.Token == null)
@@ -224,39 +260,54 @@ namespace VK_UI3.VKs
             }
             catch (Exception ex)
             {
-                (login.Frame as ExtendFrame).GoBack(new ArgSender() { ErrorText = ex.Message.ToString() });
-                throw (ex);
-
+                System.Diagnostics.Debug.WriteLine($"[VKAuth] Ошибка входа: {ex.GetType().Name}: {ex.Message}");
+                FailToLogin(ex.Message);
             }
         }
 
         public async Task ShowAnotherVerificationMethodsAsync()
         {
             if (Sid is null)
-                return;
-            _ = login.Frame.Navigate(typeof(waitPage), null, new DrillInNavigationTransitionInfo());
-
-            //   var modal = StaticService.Container.GetRequiredService<LoginVerificationMethodsModalViewModel>();
-            ObservableRangeCollection<EcosystemVerificationMethod> VerificationMethods = new();
-
-            var response = await _ecosystemCategory.GetVerificationMethodsAsync(Sid);
-
-            VerificationMethods.ReplaceRange(response.Methods.Where(b => !string.IsNullOrEmpty(b.Name?.ToString())).OrderBy(b => b.Priority));
-
-            if (!hasOnePass)
             {
-                _ = VerificationMethods.Remove(VerificationMethods.FirstOrDefault(x => x.Name == LoginWay.Passkey));
+                // Раньше здесь был просто return: страница ожидания уже показана,
+                // и пользователь оставался на ней навсегда.
+                System.Diagnostics.Debug.WriteLine("[VKAuth] ShowAnotherVerificationMethodsAsync: Sid отсутствует");
+                FailToLogin("Не удалось получить способы подтверждения входа. Попробуйте войти снова.");
+                return;
             }
 
-            ChooseVerMethods chooseVerMethods = new ChooseVerMethods();
+            _ = login.Frame.Navigate(typeof(waitPage), null, new DrillInNavigationTransitionInfo());
 
-            chooseVerMethods.VerificationMethods = VerificationMethods;
+            try
+            {
+                //   var modal = StaticService.Container.GetRequiredService<LoginVerificationMethodsModalViewModel>();
+                ObservableRangeCollection<EcosystemVerificationMethod> VerificationMethods = new();
+
+                var response = await _ecosystemCategory.GetVerificationMethodsAsync(Sid);
+
+                VerificationMethods.ReplaceRange(response.Methods.Where(b => !string.IsNullOrEmpty(b.Name?.ToString())).OrderBy(b => b.Priority));
+
+                if (!hasOnePass)
+                {
+                    _ = VerificationMethods.Remove(VerificationMethods.FirstOrDefault(x => x.Name == LoginWay.Passkey));
+                }
+
+                ChooseVerMethods chooseVerMethods = new ChooseVerMethods();
+
+                chooseVerMethods.VerificationMethods = VerificationMethods;
 
 
 
-            chooseVerMethods.vk = this;
+                chooseVerMethods.vk = this;
 
-            _ = login.Frame.Navigate(typeof(ChooseVerMethods), chooseVerMethods, new DrillInNavigationTransitionInfo());
+                _ = login.Frame.Navigate(typeof(ChooseVerMethods), chooseVerMethods, new DrillInNavigationTransitionInfo());
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[VKAuth] Ошибка получения способов подтверждения: {ex.GetType().Name}: {ex.Message}");
+                FailToLogin(ex.Message);
+            }
         }
 
         private async Task AuthPasskeyAsync()
@@ -274,9 +325,9 @@ namespace VK_UI3.VKs
                 }
             }
 
-            var (_, passkeyData) = await _authCategory.BeginPasskeyAsync(Sid);
             try
             {
+                var (_, passkeyData) = await _authCategory.BeginPasskeyAsync(Sid);
                 if (!TryBeginPasskey(passkeyData, out var authenticatorData, out var signature, out var userHandle,
                         out var clientDataJson, out var usedCredential))
                 {
@@ -306,8 +357,10 @@ namespace VK_UI3.VKs
 
                 await LoggedInAsync();
             }
-            catch (Exception ex){
-                (login.Frame as ExtendFrame).GoBack(new ArgSender() { ErrorText = ex.Message.ToString() });
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[VKAuth] Ошибка Passkey: {ex.GetType().Name}: {ex.Message}");
+                FailToLogin(ex.Message);
             }
         }
 
@@ -327,31 +380,42 @@ namespace VK_UI3.VKs
             _grantType = AndroidGrantType.PhoneConfirmationSid;
             var codeLength = 6;
 
-            if (loginWay == LoginWay.Sms)
+            try
             {
-                var (_, otpSid, smsInfo, requestedCodeLength) = await _ecosystemCategory.SendOtpSmsAsync(Sid);
+                if (loginWay == LoginWay.Sms)
+                {
+                    var (_, otpSid, smsInfo, requestedCodeLength) = await _ecosystemCategory.SendOtpSmsAsync(Sid);
 
-                Sid = otpSid;
-                codeLength = requestedCodeLength;
-                phone ??= smsInfo;
+                    Sid = otpSid;
+                    codeLength = requestedCodeLength;
+                    phone ??= smsInfo;
+                }
+                else if (loginWay == LoginWay.CallReset)
+                {
+                    var (_, otpSid, smsInfo, requestedCodeLength) = await _ecosystemCategory.SendOtpCallResetAsync(Sid);
+
+                    Sid = otpSid;
+                    codeLength = requestedCodeLength;
+                    phone ??= smsInfo;
+                }
+                else if (loginWay == LoginWay.Push)
+                {
+                    var (_, otpSid, smsInfo, requestedCodeLength) = await _ecosystemCategory.SendOtpPushAsync(Sid);
+
+                    Sid = otpSid;
+                    codeLength = requestedCodeLength;
+                    phone ??= smsInfo;
+                }
             }
-            else if (loginWay == LoginWay.CallReset)
+            catch (Exception ex)
             {
-                var (_, otpSid, smsInfo, requestedCodeLength) = await _ecosystemCategory.SendOtpCallResetAsync(Sid);
-
-                Sid = otpSid;
-                codeLength = requestedCodeLength;
-                phone ??= smsInfo;
+                System.Diagnostics.Debug.WriteLine(
+                    $"[VKAuth] Ошибка отправки кода ({loginWay}): {ex.GetType().Name}: {ex.Message}");
+                FailToLogin(ex.Message);
+                return;
             }
-            else if (loginWay == LoginWay.Push)
-            {
-                var (_, otpSid, smsInfo, requestedCodeLength) = await _ecosystemCategory.SendOtpPushAsync(Sid);
 
-                Sid = otpSid;
-                codeLength = requestedCodeLength;
-                phone ??= smsInfo;
-            }
-            else if (loginWay.ToString() == "password")
+            if (loginWay.ToString() == "password")
             {
 
                 Password passview = new Password();
@@ -439,7 +503,8 @@ namespace VK_UI3.VKs
             }
             catch (Exception e)
             {
-                (login.Frame as ExtendFrame).GoBack(new ArgSender() { ErrorText = e.Message.ToString() });
+                System.Diagnostics.Debug.WriteLine($"[VKAuth] Ошибка авторизации: {e.GetType().Name}: {e.Message}");
+                FailToLogin(e.Message);
             }
         }
 
@@ -491,7 +556,8 @@ namespace VK_UI3.VKs
             }
             catch (Exception e)
             {
-                (login.Frame as ExtendFrame).GoBack(new ArgSender() { ErrorText = e.Message.ToString() });
+                System.Diagnostics.Debug.WriteLine($"[VKAuth] Ошибка после входа: {e.GetType().Name}: {e.Message}");
+                FailToLogin(e.Message);
             }
         }
 
@@ -510,7 +576,8 @@ namespace VK_UI3.VKs
                 }
                 catch (Exception e)
                 {
-                    (login.Frame as ExtendFrame).GoBack(new ArgSender() { ErrorText = e.Message.ToString() });
+                    System.Diagnostics.Debug.WriteLine($"[VKAuth] Ошибка проверки кода: {e.GetType().Name}: {e.Message}");
+                    FailToLogin(e.Message);
                     return;
                 }
 
