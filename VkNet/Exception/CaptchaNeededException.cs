@@ -23,6 +23,7 @@ namespace VkNet.Exception
 			Sid = response.CaptchaSid;
 			Img = response.CaptchaImg;
 			RedirectUri = response.RedirectUri;
+			Remixstlid = response.Remixstlid;
 		}
 
 		/// <summary>
@@ -34,6 +35,15 @@ namespace VkNet.Exception
 		/// Uri-адрес изображения с капчей
 		/// </summary>
 		public Uri Img { get; }
-        public Uri RedirectUri { get; }
-    }
+		      public Uri RedirectUri { get; }
+
+		/// <summary>
+		/// Временный идентификатор для server-to-server капчи VK ID.
+		/// <para>
+		/// Если VK его прислал, <c>success_token</c> нужно отправлять вместе с ним:
+		/// значение параметра и cookie должны совпадать, иначе VK отклонит токен.
+		/// </para>
+		/// </summary>
+		public string Remixstlid { get; }
+		  }
 }

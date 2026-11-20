@@ -752,6 +752,8 @@ namespace VkNet
             {
                 answer = CaptchaHandler.Perform((sid, key) =>
                 {
+                    // VkParameters.Add<T> сам удаляет предыдущее значение и корректно
+                    // пропускает null — поэтому повторные вызовы здесь безопасны.
                     parameters.Add(Constants.CaptchaSid, sid);
                     parameters.Add(Constants.CaptchaKey, key);
 

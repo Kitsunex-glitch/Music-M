@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using Newtonsoft.Json;
 
@@ -51,5 +52,26 @@ namespace VkNet.Model
 		/// </summary>
 		[JsonProperty("redirect_uri", NullValueHandling = NullValueHandling.Ignore)]
 		public Uri RedirectUri { get; set; }
+
+		/// <summary>
+		/// Временный идентификатор для server-to-server капчи VK ID.
+		/// <para>
+		/// VK требует передавать <c>success_token</c> вместе с <c>remixstlid</c>:
+		/// значение параметра и cookie должны совпадать. Если VK присылает это поле
+		/// в ошибке капчи, его нужно сохранить и вернуть в повторном запросе.
+		/// </para>
+		/// </summary>
+		[JsonProperty("remixstlid", NullValueHandling = NullValueHandling.Ignore)]
+		public string Remixstlid { get; set; }
+
+		/// <summary>
+		/// Все прочие поля ошибки, которые не описаны явно.
+		/// <para>
+		/// Нужны, чтобы не терять новые параметры, которые VK добавляет
+		/// в ответ с ошибкой капчи (например, дополнительные токены сессии).
+		/// </para>
+		/// </summary>
+		[JsonExtensionData]
+		public IDictionary<string, object> AdditionalData { get; set; }
 	}
 }

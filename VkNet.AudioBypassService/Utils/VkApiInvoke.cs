@@ -40,6 +40,16 @@ public class VkApiInvoke : IVkApiInvoke
     private readonly IDeviceIdStore _deviceIdStore;
     private readonly ITokenRefreshHandler _tokenRefreshHandler;
 
+    /// <summary>
+    /// <c>remixstlid</c> из последней ошибки капчи.
+    /// <para>
+    /// VK требует передавать <c>success_token</c> вместе с этим значением:
+    /// параметр запроса и cookie должны совпадать. Хранится между итерациями
+    /// ввода капчи в рамках одного вызова.
+    /// </para>
+    /// </summary>
+    private string _currentRemixstlid;
+
     public VkApiInvoke(IRestClient client, ICaptchaHandler handler, IVkApiVersionManager versionManager,
                        IVkTokenStore tokenStore, ILanguageService languageService, IAsyncRateLimiter rateLimiter, IDeviceIdStore deviceIdStore, ITokenRefreshHandler tokenRefreshHandler)
     {
@@ -137,9 +147,42 @@ public class VkApiInvoke : IVkApiInvoke
             if (sid is { } captchaSid)
             {
                 parameters["captcha_sid"] = captchaSid.ToString();
-                parameters["captcha_key"] = key;
                 parameters["confirm"] = "1";
-                parameters.Remove("success_token");
+
+                // РАЗВИЛКА ПО ТИПУ КАПЧИ.
+                //
+                // Классическая капча (картинка): код с картинки идёт в captcha_key.
+                //
+                // Новая веб-капча VK ID: солвер возвращает success_token — это JWE
+                // (длинная строка с 4 точками). Такой токен VK принимает ТОЛЬКО
+                // в параметре success_token. Если положить его в captcha_key,
+                // VK его не распознаёт и выдаёт новую капчу — бесконечный цикл.
+                //
+                // Раньше здесь безусловно стояло parameters.Remove("success_token"),
+                // то есть токен гарантированно выбрасывался и подменялся на captcha_key.
+                if (IsWebCaptchaToken(key))
+                {
+                    parameters["success_token"] = key;
+                    parameters.Remove("captcha_key");
+
+                    // success_token работает только в паре с remixstlid —
+                    // значением, которое VK прислал в ошибке капчи.
+                    if (!string.IsNullOrEmpty(_currentRemixstlid))
+                    {
+                        parameters["remixstlid"] = _currentRemixstlid;
+                        System.Diagnostics.Debug.WriteLine("[Captcha] remixstlid передан вместе с success_token");
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine("[Captcha] remixstlid отсутствует — success_token уходит без него");
+                    }
+                }
+                else
+                {
+                    parameters["captcha_key"] = key;
+                    parameters.Remove("success_token");
+                    parameters.Remove("remixstlid");
+                }
             }
 
             await _rateLimiter.WaitNextAsync();
@@ -161,6 +204,21 @@ public class VkApiInvoke : IVkApiInvoke
             {
                 return VkErrors.IfErrorThrowException(response.Value)["response"]!;
             }
+            catch (CaptchaNeededException captchaEx)
+            {
+                // Сохраняем remixstlid из ошибки — он понадобится вместе с success_token.
+                if (!string.IsNullOrEmpty(captchaEx.Remixstlid))
+                {
+                    _currentRemixstlid = captchaEx.Remixstlid;
+                    System.Diagnostics.Debug.WriteLine("[Captcha] Получен remixstlid от VK");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("[Captcha] VK не прислал remixstlid");
+                }
+
+                throw;
+            }
             catch (VkApiMethodInvokeException e) when (e.ErrorCode is 5 or 1117 or 1114)
             {
                 if (await _tokenRefreshHandler.RefreshTokenAsync(_tokenStore.Token) is not { } newToken)
@@ -174,4 +232,28 @@ public class VkApiInvoke : IVkApiInvoke
 
     public DateTimeOffset? LastInvokeTime { get; private set;}
     public TimeSpan? LastInvokeTimeSpan => DateTimeOffset.Now - LastInvokeTime;
+
+    /// <summary>
+    /// Определяет, что <paramref name="key"/> — это токен веб-капчи VK ID
+    /// (<c>success_token</c>), а не текстовый код с картинки.
+    /// <para>
+    /// Признак: success_token — это JWE, пять сегментов через точку
+    /// (заголовок.ключ.iv.шифртекст.тег), длиной порядка тысячи символов.
+    /// Код с картинки — короткая строка из 5–6 символов.
+    /// </para>
+    /// </summary>
+    private static bool IsWebCaptchaToken(string key)
+    {
+        if (string.IsNullOrEmpty(key) || key.Length < 100)
+            return false;
+
+        var dots = 0;
+        foreach (var c in key)
+        {
+            if (c == '.')
+                dots++;
+        }
+
+        return dots >= 4;
+    }
 }
