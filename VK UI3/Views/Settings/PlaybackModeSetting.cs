@@ -16,6 +16,7 @@ namespace VK_UI3.Views.Settings
         private readonly ComboBox _comboBox;
         private readonly TextBlock _descriptionText;
         private bool _isInitializing;
+        private bool _loaded;
 
         public PlaybackModeSetting()
         {
@@ -77,6 +78,7 @@ namespace VK_UI3.Views.Settings
             finally
             {
                 _isInitializing = false;
+                _loaded = true;
             }
         }
 
@@ -87,7 +89,9 @@ namespace VK_UI3.Views.Settings
 
             UpdateDescription(info);
 
-            if (_isInitializing)
+            // Не пишем настройку, пока контрол не загрузился: SelectionChanged
+            // может прилететь до Loaded и перезаписать выбор дефолтом.
+            if (_isInitializing || !_loaded)
                 return;
 
             PlaybackTypeHelper.SetSelected(info.Type);

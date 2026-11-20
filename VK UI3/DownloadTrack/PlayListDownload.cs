@@ -144,7 +144,7 @@ namespace VK_UI3.DownloadTrack
                         var downloadSource = Services.Player.AudioPlaybackResolver.Resolve(
                             a,
                             Models.PlaybackType.Auto,
-                            ffmpegAvailable: true);
+                            ffmpegAvailable: MusicX.Services.Player.Sources.MediaSourceBase.IsFfmpegAvailable());
 
                         if (!downloadSource.IsValid)
                         {

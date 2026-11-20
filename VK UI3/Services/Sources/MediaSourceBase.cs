@@ -562,6 +562,35 @@ public abstract class MediaSourceBase : ITrackMediaSource
         return resolved?.Url?.ToString();
     }
 
+    private static bool? _ffmpegAvailableCache;
+
+    /// <summary>
+    /// Кэшированная проверка наличия FFmpeg. Раньше <c>CheckFFmpeg().IsExist()</c>
+    /// вызывался на каждом Resolve (горячий путь переключения треков) и мог
+    /// «дёргаться» — из-за этого поведение было недетерминированным.
+    /// Сбросить кэш можно через <see cref="InvalidateFfmpegCache"/>.
+    /// </summary>
+    public static bool IsFfmpegAvailable()
+    {
+        if (_ffmpegAvailableCache.HasValue)
+            return _ffmpegAvailableCache.Value;
+
+        try
+        {
+            _ffmpegAvailableCache = new VK_UI3.DownloadTrack.CheckFFmpeg().IsExist();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[Playback] FFmpeg availability check failed: {ex.Message}");
+            _ffmpegAvailableCache = false;
+        }
+
+        return _ffmpegAvailableCache.Value;
+    }
+
+    /// <summary>Сбрасывает кэш доступности FFmpeg (например, после установки FFmpeg).</summary>
+    public static void InvalidateFfmpegCache() => _ffmpegAvailableCache = null;
+
     /// <summary>
     /// Выбирает поток трека с учётом настроек и доступности FFmpeg.
     /// </summary>
@@ -569,17 +598,7 @@ public abstract class MediaSourceBase : ITrackMediaSource
     {
         var mode = requested ?? PlaybackTypeHelper.GetSelected();
 
-        bool ffmpegAvailable;
-
-        try
-        {
-            ffmpegAvailable = new VK_UI3.DownloadTrack.CheckFFmpeg().IsExist();
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[Playback] FFmpeg availability check failed: {ex.Message}");
-            ffmpegAvailable = false;
-        }
+        bool ffmpegAvailable = IsFfmpegAvailable();
 
         var resolved = AudioPlaybackResolver.Resolve(data, mode, ffmpegAvailable);
 

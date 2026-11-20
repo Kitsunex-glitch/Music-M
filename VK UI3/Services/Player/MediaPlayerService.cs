@@ -48,6 +48,12 @@ namespace VK_UI3.Services
         public static event EventHandler<VolumeChangedEventArgs> VolumeChanged;
         public static event EventHandler<TimeSpan> PositionChanged;
 
+        /// <summary>
+        /// Трек не удалось воспроизвести (нет доступного потока / ошибка открытия).
+        /// Передаёт трек, на котором произошла ошибка.
+        /// </summary>
+        public static event EventHandler PlaybackFailed;
+
         #endregion
 
         #region Properties
@@ -923,13 +929,42 @@ namespace VK_UI3.Services
                 // Выбираем поток согласно настройке «Тип воспроизведения» (с откатом к доступному).
                 var resolved = MediaSourceBase.Resolve(trackdata.audio);
 
+                // Последний резерв: если резолвер не нашёл поток, но у трека есть прямой URL —
+                // играем его (старое поведение). Раньше здесь был «return», из-за которого
+                // плеер оставался со старым Source, не приходили MediaOpened/MediaEnded и
+                // переключение треков «зависало».
+                if (!resolved.IsValid && trackdata.audio?.Url != null)
+                {
+                    resolved = new ResolvedStream
+                    {
+                        Url = trackdata.audio.Url,
+                        StreamType = "mp3",
+                        RequestedType = PlaybackTypeHelper.GetSelected(),
+                        ActualType = PlaybackType.Mp3,
+                        IsFallback = true,
+                        FallbackReason = "резолвер не нашёл поток, использован прямой URL трека"
+                    };
+                }
+
                 if (!resolved.IsValid)
                 {
                     System.Diagnostics.Debug.WriteLine($"[TrackSwitch] No playable stream: {resolved.FallbackReason}");
+                    // Сообщаем UI об ошибке и переходим к следующему треку, чтобы очередь не вставала.
+                    NotifyPlaybackFailed(trackdata);
+                    PlayNextTrack();
                     return;
                 }
 
                 CurrentPlaybackStream = resolved;
+
+                // ВАЖНО: сообщаем UI о новом треке СРАЗУ, до сетевой загрузки источника.
+                // Раньше события поднимались только после открытия потока, из-за чего
+                // интерфейс «переключался» с задержкой (ждал фактического старта звука).
+                PlayingTrack = trackdata;
+                _mediaPlayer.Pause();
+                iVKGetAudio.ChangePlayAudio(trackdata);
+                NotifyAudioPlayedChange(trackdata);
+                UpdateSystemMediaDisplay(trackdata);
 
                 var mediaSource = Windows.Media.Core.MediaSource.CreateFromUri(new Uri(resolved.Url.ToString()));
                 var mediaPlaybackItem = new Windows.Media.Playback.MediaPlaybackItem(mediaSource);
@@ -938,12 +973,9 @@ namespace VK_UI3.Services
                 mediaPlaybackItem.AudioTracksChanged += MediaPlaybackItem_AudioTracksChanged;
                 mediaPlaybackItem.TimedMetadataTracksChanged += MediaPlaybackItem_TimedMetadataTracksChanged;
 
-                PlayingTrack = trackdata;
-                _mediaPlayer.Pause();
-
                 System.Diagnostics.Debug.WriteLine($"[TrackSwitch] Before LoadWithMediaSources/LoadBasicMediaItem");
 
-                bool ffmpegExists = new CheckFFmpeg().IsExist();
+                bool ffmpegExists = MediaSourceBase.IsFfmpegAvailable();
                 bool useFfmpeg = true;
                 var setting = SettingsTable.GetSetting("useFfmpegForPlayback");
                 if (setting != null && setting.settingValue == "0")
@@ -969,12 +1001,6 @@ namespace VK_UI3.Services
                     _mediaPlayer.Position = new TimeSpan(0);
                 }
 
-                iVKGetAudio.ChangePlayAudio(trackdata);
-                NotifyAudioPlayedChange(trackdata);
-
-                // Обновить отображение в SystemMediaTransportControls
-                UpdateSystemMediaDisplay(trackdata);
-
                 _mediaPlayer.Play();
 
                 System.Diagnostics.Debug.WriteLine($"[TrackSwitch] LoadAndPlayTrack completed for track: {trackdata.audio.Title}");
@@ -985,7 +1011,24 @@ namespace VK_UI3.Services
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[TrackSwitch] Error in LoadAndPlayTrack: {ex.Message}");
-                // Не пробрасываем исключение — приложение не должно падать
+                // Не пробрасываем исключение — приложение не должно падать.
+                // Сообщаем UI, чтобы он не «висел» в состоянии «играет».
+                NotifyPlaybackFailed(trackdata);
+            }
+        }
+
+        /// <summary>
+        /// Сообщает UI, что текущий трек не удалось воспроизвести.
+        /// </summary>
+        private static void NotifyPlaybackFailed(ExtendedAudio trackdata)
+        {
+            try
+            {
+                PlaybackFailed?.Invoke(trackdata, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[TrackSwitch] PlaybackFailed handler error: {ex.Message}");
             }
         }
 

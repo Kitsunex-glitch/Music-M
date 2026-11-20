@@ -34,6 +34,21 @@ public class VkMediaSource : MediaSourceBase
         // Если выбранного формата у трека нет — резолвер вернёт первый доступный.
         var resolved = Resolve(track);
 
+        // Последний резерв — прямой URL трека (раньше проверялось только `track.Url != null`,
+        // и любой такой трек открывался; сохраняем это поведение, чтобы не «терять» треки).
+        if (!resolved.IsValid && track.Url != null)
+        {
+            resolved = new ResolvedStream
+            {
+                Url = track.Url,
+                StreamType = "mp3",
+                RequestedType = VK_UI3.Models.PlaybackTypeHelper.GetSelected(),
+                ActualType = VK_UI3.Models.PlaybackType.Mp3,
+                IsFallback = true,
+                FallbackReason = "резолвер не нашёл поток, использован прямой URL трека"
+            };
+        }
+
         if (!resolved.IsValid)
         {
             _logger.Warn($"[Playback] No playable stream for track {track.Id}: {resolved.FallbackReason}");
@@ -41,6 +56,11 @@ public class VkMediaSource : MediaSourceBase
         }
 
         var sourceUrl = resolved.Url.ToString();
+
+        // Для TagLib берём ТОЛЬКО прямой URL трека (обычно mp3). sourceUrl может быть
+        // m3u8/mpd (HLS/DASH), которые TagLib не открывает и падает с исключением,
+        // из-за чего трек не открывался.
+        var tagUrl = track.Url?.ToString() ?? sourceUrl;
 
         try
         {
@@ -153,9 +173,31 @@ public class VkMediaSource : MediaSourceBase
                 // i think its better to use task.run over task.yield because we aren't doing async with ffmpeg
                 var playbackItem = await Task.Run(() =>
                 {
-                    using var file = MediaFile.Open(sourceUrl, mediaOptions);
+                    // TagLib/FFMediaToolkit надёжно открывают прямой файл (mp3/aac/flac).
+                    // Если tagUrl — это HLS/DASH (m3u8/mpd), сначала пробуем его,
+                    // а при ошибке откатываемся на sourceUrl, чтобы не терять трек.
+                    MediaFile file = null;
+                    try
+                    {
+                        file = MediaFile.Open(tagUrl, mediaOptions);
+                    }
+                    catch (Exception tagEx)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[FFMedia] Open(tagUrl) failed: {tagEx.Message}; trying sourceUrl");
+                        if (!string.Equals(tagUrl, sourceUrl, StringComparison.OrdinalIgnoreCase))
+                        {
+                            file = MediaFile.Open(sourceUrl, mediaOptions);
+                        }
+                        else
+                        {
+                            throw;
+                        }
+                    }
 
-                    return CreateMediaPlaybackItem(file);
+                    using (file)
+                    {
+                        return CreateMediaPlaybackItem(file);
+                    }
                 }, cancellationToken);
 
                 MediaItemDisplayProperties props = playbackItem.GetDisplayProperties();

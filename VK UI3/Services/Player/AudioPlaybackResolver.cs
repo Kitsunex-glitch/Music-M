@@ -66,6 +66,12 @@ namespace VK_UI3.Services.Player
     {
         /// <summary>
         /// Приоритет отката: чем раньше тип, тем он предпочтительнее.
+        /// <para>
+        /// Прямые форматы (mp3/aac/flac) идут первыми — их понимают Windows-декодер
+        /// и TagLib без FFmpeg. HLS/DASH стоят в конце: авто-режим падает на них
+        /// только если прямых потоков у трека нет. Открытие .m3u8/.mpd через TagLib
+        /// закрыто try/catch в VkMediaSource, поэтому это безопасно.
+        /// </para>
         /// </summary>
         private static readonly string[] FallbackPriority =
         {
