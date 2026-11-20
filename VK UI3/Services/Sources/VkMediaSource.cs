@@ -64,7 +64,12 @@ public class VkMediaSource : MediaSourceBase
 
         try
         {
-            var rtMediaSource = await CreateWinRtMediaSource(sourceUrl, cancellationToken: cancellationToken);
+            // ConfigureAwait(false): метод вызывается с пула потоков (LoadWithMediaSources),
+            // и его продолжения не должны зависеть от SynchronizationContext. Если бы он
+            // когда-нибудь был вызван с UI-потока, await без ConfigureAwait(false) вернул
+            // бы продолжение на UI, а длительная синхронная работа внутри заморозила бы его.
+            var rtMediaSource = await CreateWinRtMediaSource(sourceUrl, cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
 
             var eq = "";
             if (equalizer != null)
@@ -78,7 +83,8 @@ public class VkMediaSource : MediaSourceBase
 
             
 
-            await rtMediaSource.OpenWithMediaPlayerAsync(player).AsTask(cancellationToken);
+            await rtMediaSource.OpenWithMediaPlayerAsync(player).AsTask(cancellationToken)
+                .ConfigureAwait(false);
 
             var playbackItem = player.Source as MediaPlaybackItem;
 
@@ -198,7 +204,7 @@ public class VkMediaSource : MediaSourceBase
                     {
                         return CreateMediaPlaybackItem(file);
                     }
-                }, cancellationToken);
+                }, cancellationToken).ConfigureAwait(false);
 
                 MediaItemDisplayProperties props = playbackItem.GetDisplayProperties();
                 props.Type = Windows.Media.MediaPlaybackType.Music;

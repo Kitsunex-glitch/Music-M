@@ -669,21 +669,43 @@ public abstract class MediaSourceBase : ITrackMediaSource
             if (Interlocked.Exchange(ref disposed, 1) == 1)
                 return;
 
-            Debug.WriteLine("[FFMedia] Player source changed, disposing rtObject");
             player.SourceChanged -= PlayerOnSourceChanged;
 
-            if (rtObject is IDisposable disposable)
+            // ВАЖНО: не освобождаем rtObject прямо в обработчике.
+            // SourceChanged приходит и при переходе на новый источник, и при
+            // Source = null. В этот момент MediaPlayer (и FFMediaToolkit внутри)
+            // ещё держит ссылку на объект — немедленный Dispose давал гонку и
+            // ошибку 0xC00D36B6 (MF_E_NOT_INITIALIZED) в логе.
+            // Откладываем освобождение, чтобы плеер успел отпустить ссылку.
+            Debug.WriteLine("[FFMedia] Player source changed, scheduling delayed dispose of rtObject");
+            _ = Task.Delay(SourceObjectDisposeDelay).ContinueWith(_ =>
             {
-                disposable.Dispose();
-                Debug.WriteLine("[FFMedia] rtObject disposed successfully");
-            }
-            else
-            {
-                GC.ReRegisterForFinalize(rtObject);
-                Debug.WriteLine("[FFMedia] rtObject re-registered for finalization");
-            }
+                try
+                {
+                    if (rtObject is IDisposable disposable)
+                    {
+                        disposable.Dispose();
+                        Debug.WriteLine("[FFMedia] rtObject disposed (delayed)");
+                    }
+                    else
+                    {
+                        GC.ReRegisterForFinalize(rtObject);
+                        Debug.WriteLine("[FFMedia] rtObject re-registered for finalization");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[FFMedia] delayed dispose error: {ex.Message}");
+                }
+            }, TaskScheduler.Default);
         }
 
         player.SourceChanged += PlayerOnSourceChanged;
     }
+
+    /// <summary>
+    /// Задержка перед освобождением rtObject после смены источника:
+    /// даёт MediaPlayer время отпустить нативные ссылки (иначе — 0xC00D36B6).
+    /// </summary>
+    private static readonly TimeSpan SourceObjectDisposeDelay = TimeSpan.FromMilliseconds(750);
 }
