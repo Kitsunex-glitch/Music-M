@@ -268,10 +268,14 @@ namespace VK_UI3.Services
             // Если режим "Повторять один", то перезапускаем текущий трек
             if (repeatMode == "RepeatOne")
             {
-                // Перезапускаем текущий трек
+                // Перезапускаем текущий трек.
+                // Событие MediaEnded приходит в MTA-потоке медиаплеера, поэтому
+                // запуск PlayTrack напрямую был бы гонкой с UI-версией.
+                // PlayTrack сам уходит на пул потоков, но инициируем его явно
+                // через Task.Run, чтобы не зависеть от контекста события.
                 if (PlayingTrack != null)
                 {
-                    _ = PlayTrack();
+                    _ = Task.Run(() => PlayTrack());
                 }
             }
             else
@@ -318,7 +322,9 @@ namespace VK_UI3.Services
         private static void CommandManager_NextReceived(MediaPlaybackCommandManager sender,
             MediaPlaybackCommandManagerNextReceivedEventArgs args)
         {
-            Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread().TryEnqueue(() =>
+            // GetForCurrentThread() в MTA-потоке CommandManager вернёт null —
+            // раньше это давало NRE и команда «следующий трек» из SMTC терялась.
+            MainWindow.mainWindow?.DispatcherQueue.TryEnqueue(() =>
             {
                 PlayNextTrack();
             });
@@ -327,7 +333,7 @@ namespace VK_UI3.Services
         private static void CommandManager_PreviousReceived(MediaPlaybackCommandManager sender,
             MediaPlaybackCommandManagerPreviousReceivedEventArgs args)
         {
-            Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread().TryEnqueue(() =>
+            MainWindow.mainWindow?.DispatcherQueue.TryEnqueue(() =>
             {
                 HandlePreviousTrack();
             });
@@ -336,7 +342,7 @@ namespace VK_UI3.Services
         private static void CommandManager_PauseReceived(MediaPlaybackCommandManager sender,
             MediaPlaybackCommandManagerPauseReceivedEventArgs args)
         {
-            Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread().TryEnqueue(() =>
+            MainWindow.mainWindow?.DispatcherQueue.TryEnqueue(() =>
             {
                 _mediaPlayer.Pause();
             });
@@ -345,7 +351,7 @@ namespace VK_UI3.Services
         private static void CommandManager_PlayReceived(MediaPlaybackCommandManager sender,
             MediaPlaybackCommandManagerPlayReceivedEventArgs args)
         {
-            Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread().TryEnqueue(() =>
+            MainWindow.mainWindow?.DispatcherQueue.TryEnqueue(() =>
             {
                 _mediaPlayer.Play();
             });
@@ -563,6 +569,12 @@ namespace VK_UI3.Services
                 return;
             }
 
+            // ВАЖНО: всю смену индекса + запуск загрузки делаем ВНЕ lock.
+            // Раньше внутри lock() стояла в очередь async-лямбда на UI-потоке,
+            // и lock удерживался, пока UI-поток не начнёт её выполнять. Если UI
+            // занят (или сам ждёт lock) — deadlock: события плеера не доходят,
+            // позиция не обновляется, треки не переключаются.
+
             try
             {
                 var now = DateTime.Now;
@@ -574,18 +586,17 @@ namespace VK_UI3.Services
 
                 _lastTrackSwitchTime = now;
 
-                MainWindow.mainWindow.DispatcherQueue.TryEnqueue(async () =>
-                {
-                    try
-                    {
-                        iVKGetAudio?.setNextTrackForPlay();
-                        await PlayTrack();
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[TrackSwitch] Error in PlayNextTrack: {ex.Message}");
-                    }
-                });
+                // Раньше смена индекса ставилась в очередь UI-потока (TryEnqueue),
+                // а вместе с ней и await PlayTrack(). Async-лямбда после первого
+                // await продолжалась на UI-потоке, а внутри PlayTrack идут сетевые
+                // вызовы VK (SetBroadcastAsync, sendStartEvent, статистика), чьи
+                // completion тоже маршалятся в UI-поток → взаимная блокировка.
+                // UI замирал: переставали приходить PositionChanged (позиция не
+                // обновлялась), события плеера не обрабатывались, треки не
+                // переключались. Теперь индекс меняем сразу, а PlayTrack идёт на
+                // пуле потоков и сам маршалит обновления в DispatcherQueue.
+                iVKGetAudio?.setNextTrackForPlay();
+                _ = PlayTrack();
             }
             finally
             {
@@ -614,18 +625,10 @@ namespace VK_UI3.Services
 
                 _lastTrackSwitchTime = now;
 
-                MainWindow.mainWindow.DispatcherQueue.TryEnqueue(async () =>
-                {
-                    try
-                    {
-                        iVKGetAudio?.setPreviusTrackForPlay();
-                        await PlayTrack();
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[TrackSwitch] Error in PlayPreviousTrack: {ex.Message}");
-                    }
-                });
+                // См. комментарий в PlayNextTrack: PlayTrack не должен
+                // выполняться на UI-потоке, иначе возможен дедлок UI ↔ сеть.
+                iVKGetAudio?.setPreviusTrackForPlay();
+                _ = PlayTrack();
             }
             finally
             {
@@ -636,25 +639,40 @@ namespace VK_UI3.Services
 
         public static async void PlayList(IVKGetAudio userAudio)
         {
-            if (userAudio.listAudio.Count == 0)
+            // ВАЖНО: PlayList вызывается из обработчика клика по треку на UI-потоке.
+            // Если список пуст, раньше здесь стояло `await tcs.Task` — продолжение
+            // возвращалось в UI-поток, а onListUpdate поднимается в потоке загрузки,
+            // и UI подвисал до прихода списка. Уводим ожидание списка на пул потоков,
+            // чтобы UI-поток оставался свободным (перерисовка, тики позиции и т.д.).
+            try
             {
-                var tcs = new TaskCompletionSource<bool>();
-                EventHandler handler = null;
-                handler = (sender, args) =>
+                if (userAudio.listAudio.Count == 0)
                 {
-                    userAudio.onListUpdate -= handler;
-                    tcs.SetResult(true);
-                };
-                userAudio.onListUpdate += handler;
+                    await Task.Run(async () =>
+                    {
+                        var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                        EventHandler handler = null;
+                        handler = (sender, args) =>
+                        {
+                            userAudio.onListUpdate -= handler;
+                            tcs.TrySetResult(true);
+                        };
+                        userAudio.onListUpdate += handler;
 
-                userAudio.GetTracks();
-                await tcs.Task;
+                        userAudio.GetTracks();
+                        await tcs.Task;
+                    });
+                }
+
+                if (userAudio.listAudio.Count == 0) return;
+
+                iVKGetAudio = userAudio;
+                _ = PlayTrack();
             }
-
-            if (userAudio.listAudio.Count == 0) return;
-
-            iVKGetAudio = userAudio;
-            _ = PlayTrack();
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[TrackSwitch] PlayList error: {ex.Message}");
+            }
         }
 
         #endregion
@@ -669,6 +687,8 @@ namespace VK_UI3.Services
         /// </summary>
         public static void HandlePreviousTrack()
         {
+            bool shouldGoPrevious = false;
+
             lock (_previousTrackLock)
             {
                 var now = DateTime.Now;
@@ -693,8 +713,19 @@ namespace VK_UI3.Services
                 }
                 else
                 {
-                    PlayPreviousTrack();
+                    // ВАЖНО: PlayPreviousTrack() не должен вызываться внутри lock.
+                    // Раньше блокировка удерживалась на всё время загрузки трека,
+                    // следующий HandlePreviousTrack навсегда вставал в ожидании
+                    // этого lock, а вместе с ним замирал UI-поток: переставали
+                    // приходить PositionChanged, не обновлялась позиция и не
+                    // переключались треки. Смена индекса вынесена из блокировки.
+                    shouldGoPrevious = true;
                 }
+            }
+
+            if (shouldGoPrevious)
+            {
+                PlayPreviousTrack();
             }
         }
 
@@ -709,7 +740,30 @@ namespace VK_UI3.Services
         /// </summary>
         private static int _loadGeneration;
 
-        private async static Task PlayTrack(long? v = 0, TimeSpan? position = null)
+        private static Task PlayTrack(long? v = 0, TimeSpan? position = null)
+        {
+            // Весь конвейер загрузки трека выполняем на пуле потоков.
+            // Причина: внутри PlayTrack есть сетевые вызовы VK (SetBroadcastAsync,
+            // sendStartEvent, статистика), чьи completion маршалятся в UI-поток.
+            // Если PlayTrack крутится на UI-потоке, получается взаимоблокировка:
+            // UI ждёт сеть, сеть ждёт UI. UI перестаёт обновлять позицию и
+            // обрабатывать события плеера, а переключение треков «залипает».
+            // Плюс это перекрывало внутренний lock() в HandlePreviousTrack,
+            // который держится до конца PlayPreviousTrack → PlayTrack.
+            return Task.Run(async () =>
+            {
+                try
+                {
+                    await PlayTrackCore(v, position);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[TrackSwitch] Unhandled error in PlayTrack: {ex.Message}");
+                }
+            });
+        }
+
+        private async static Task PlayTrackCore(long? v, TimeSpan? position)
         {
             // Ждём очередь, а не отказываем: отказ терял трек, потому что
             // PlayNextTrack() уже успевал сдвинуть currentTrack.
@@ -795,12 +849,14 @@ namespace VK_UI3.Services
         {
             if (iVKGetAudio.listAudio.Count == 0)
             {
-                var tcs = new TaskCompletionSource<bool>();
+                // RunContinuationsAsynchronously — чтобы продолжение не выполнялось
+                // синхронно в потоке, который поднимает onListUpdate.
+                var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
                 EventHandler handler = null;
                 handler = (sender, args) =>
                 {
                     iVKGetAudio.onListUpdate -= handler;
-                    tcs.SetResult(true);
+                    tcs.TrySetResult(true);
                 };
                 iVKGetAudio.onListUpdate += handler;
 

@@ -47,6 +47,7 @@ namespace VK_UI3.Controllers
         private long _sliderPositionMs;
         private double _redFillPercent = 0;
         private bool isManualChange = false;
+        private readonly Storyboard _redRectangleStoryboard = new Storyboard();
         private double actualHeight = 0;
         private bool enablinUI = false;
 
@@ -93,7 +94,10 @@ namespace VK_UI3.Controllers
         {
             get
             {
-                var trackData = TrackDataThis;
+                // PlayingTrack вместо TrackDataThis: геттер Thumbnail вызывается
+                // на UI-потоке при обновлении инфо о треке, а TrackDataThis —
+                // синхронный .Result, который может заблокировать UI.
+                var trackData = VK_UI3.Services.MediaPlayerService.PlayingTrack ?? TrackDataThis;
                 if (trackData?.audio?.Album?.Thumb == null) return "null";
 
                 return trackData.audio.Album.Thumb.Photo600
@@ -270,7 +274,12 @@ namespace VK_UI3.Controllers
             UpdateDiscordState();
 
             // Объявляем смену трека экранному диктору.
-            var track = TrackDataThis;
+            // ВАЖНО: не используем TrackDataThis (это _TrackDataThisGet().Result) —
+            // синхронное ожидание Task на UI-потоке. Если внутри GetTrackPlay
+            // есть await, continuation не сможет выполниться (UI занят) →
+            // дедлок: UI замирает, позиция не обновляется, треки не переключаются.
+            // PlayingTrack уже проставлен в MediaPlayerService перед вызовом события.
+            var track = VK_UI3.Services.MediaPlayerService.PlayingTrack ?? TrackDataThis;
             if (track?.audio != null)
             {
                 AnnounceToScreenReader($"Сейчас играет: {track.audio.Artist} — {track.audio.Title}");
@@ -334,11 +343,13 @@ namespace VK_UI3.Controllers
         private void PreviousBTN_Tapped(object sender, TappedRoutedEventArgs e)
         {
             VK_UI3.Services.MediaPlayerService.HandlePreviousTrack();
+            setButtonPlayNext();
         }
 
         private void NextBTN_Tapped(object sender, TappedRoutedEventArgs e)
         {
             PlayNextTrack();
+            setButtonPlayNext();
         }
 
         private void goToPlayList_BTN(object sender, TappedRoutedEventArgs e)
@@ -517,15 +528,25 @@ namespace VK_UI3.Controllers
 
         private void UpdateTrackInfoDisplay()
         {
-            TrackDurationMs = (long)(TrackDataThis?.audio?.Duration * 1000 ?? 0);
+            // ВАЖНО: не обращаемся к TrackDataThis (это синхронный .Result
+            // поверх async-запроса трека). Вызывается из события смены трека
+            // на UI-потоке — при незавершённой загрузке это блокировало UI:
+            // позиция не обновлялась, события плеера не обрабатывались,
+            // треки переставали переключаться.
+            // PlayingTrack проставляется в MediaPlayerService до вызова события.
+            var track = VK_UI3.Services.MediaPlayerService.PlayingTrack;
+            if (track == null)
+                return;
+
+            TrackDurationMs = (long)(track.audio?.Duration * 1000 ?? 0);
             OnPropertyChanged(nameof(TrackPosition));
             OnPropertyChanged(nameof(TrackDataThis));
 
             changeImage.ChangeImageWithAnimation(Thumbnail);
-            changeText.ChangeTextWithAnimation(TrackDataThis?.audio?.Artist ?? string.Empty);
-            changeText2.ChangeTextWithAnimation(TrackDataThis?.audio?.Title ?? string.Empty);
+            changeText.ChangeTextWithAnimation(track.audio?.Artist ?? string.Empty);
+            changeText2.ChangeTextWithAnimation(track.audio?.Title ?? string.Empty);
 
-            FlyOutControl.dataTrack = TrackDataThis;
+            FlyOutControl.dataTrack = track;
         }
 
         private void HandleTrackPlayedHighlighting()
@@ -628,7 +649,10 @@ namespace VK_UI3.Controllers
             if (setting != null && setting.settingValue.Equals("1"))
                 return;
 
-            discordRichPresenceManager.SetTrack(TrackDataThis, VK_UI3.Services.MediaPlayerService.MediaPlayer);
+            // Не используем TrackDataThis (.Result): метод вызывается на UI-потоке.
+            var track = VK_UI3.Services.MediaPlayerService.PlayingTrack ?? TrackDataThis;
+            if (track == null) return;
+            discordRichPresenceManager.SetTrack(track, VK_UI3.Services.MediaPlayerService.MediaPlayer);
         }
 
         private void DisableAllChildren(DependencyObject parent, bool enable = false)
@@ -662,6 +686,13 @@ namespace VK_UI3.Controllers
             this.DispatcherQueue.TryEnqueue(() =>
             {
                 double toWidth = RootGrid.ActualWidth * RedFillPercent;
+
+                // ВАЖНО: Storyboard кладётся в поле и переиспользуется.
+                // Раньше здесь на КАЖДЫЙ тик позиции (4-10 раз в секунду) создавался
+                // новый Storyboard и не останавливался старый. Длительность 40 мс
+                // меньше интервала тиков, поэтому анимации накапливались, и после
+                // нескольких переключений треков UI-поток увязал в обработке тиков
+                // анимаций — плеер переставал реагировать на события и смену трека.
                 var animation = new DoubleAnimation
                 {
                     To = toWidth,
@@ -671,9 +702,12 @@ namespace VK_UI3.Controllers
 
                 Storyboard.SetTarget(animation, RedRectangle);
                 Storyboard.SetTargetProperty(animation, "Width");
-                var sb = new Storyboard();
-                sb.Children.Add(animation);
-                sb.Begin();
+
+                _redRectangleStoryboard.Stop();
+                _redRectangleStoryboard.Children.Clear();
+                _redRectangleStoryboard.Children.Add(animation);
+                _redRectangleStoryboard.Begin();
+
                 RedRectangle.Width = toWidth;
             });
         }

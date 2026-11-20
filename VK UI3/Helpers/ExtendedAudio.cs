@@ -36,9 +36,18 @@ namespace VK_UI3.Helpers
         {
             get
             {
-                var trackdata = VK_UI3.Services.MediaPlayerService._TrackDataThisGet().Result;
+                // ВАЖНО: раньше здесь был _TrackDataThisGet().Result — синхронное
+                // ожидание Task прямо в геттере. Геттер вызывается из обработчика
+                // клика по треку на UI-потоке (TrackControl.UCcontrol_Tapped),
+                // и если текущий трек ещё догружается (GetTrackPlay внутри делает
+                // await), продолжение не может выполниться на занятом UI-потоке —
+                // взаимная блокировка. Отсюда «подвисание UI при клике на трек».
+                // PlayingTrack проставляется до вызова событий и уже содержит
+                // нужный AccessKey, поэтому .Result не нужен.
+                var trackdata = VK_UI3.Services.MediaPlayerService.PlayingTrack
+                                ?? VK_UI3.Services.MediaPlayerService._trackDataThis;
 
-                if (trackdata == null) return false;
+                if (trackdata?.audio == null) return false;
 
                 return trackdata.audio.AccessKey == this.audio.AccessKey;
             }
