@@ -94,20 +94,6 @@
 						SelectionChanged="GeniusToggle_SelectionChanged" />
 				</StackPanel>
 
-				<StackPanel VerticalAlignment="Center" Spacing="2">
-					<TextBlock
-						FontSize="11"
-						Opacity="0.6"
-						Style="{ThemeResource CaptionTextBlockStyle}"
-						Text="Стиль" />
-					<ComboBox
-						x:Name="EffectsToggle"
-						MinWidth="150"
-						AutomationProperties.HelpText="Позволяет выбрать готовый визуальный стиль текста"
-						AutomationProperties.Name="Выбор визуального стиля текста"
-						SelectionChanged="EffectsToggle_SelectionChanged"
-						ToolTipService.ToolTip="Готовый пресет оформления" />
-				</StackPanel>
 			</StackPanel>
 
 			<TextBlock

@@ -99,15 +99,6 @@ namespace VK_UI3.Views.ModalsPages
             var savedSource = int.Parse(DB.SettingsTable.GetSetting("lyricsSource", "0").settingValue);
             GeniusToggle.SelectedIndex = savedSource >= 0 && savedSource < GeniusToggle.Items.Count ? savedSource : 0;
 
-            // Визуальный эффект
-            EffectsToggle.Items.Add("Классика");
-            EffectsToggle.Items.Add("Неон (glow)");
-            EffectsToggle.Items.Add("Спокойный");
-            EffectsToggle.Items.Add("3D");
-            var savedEffect = int.Parse(DB.SettingsTable.GetSetting("lyricsEffect", "1").settingValue);
-            EffectsToggle.SelectedIndex = savedEffect >= 0 && savedEffect < EffectsToggle.Items.Count ? savedEffect : 1;
-            ApplyEffectPreset(EffectsToggle.SelectedIndex);
-
             InitSettingsPane();
         }
 
@@ -225,15 +216,7 @@ namespace VK_UI3.Views.ModalsPages
 
         #region Effects
 
-        private void EffectsToggle_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            var index = EffectsToggle.SelectedIndex;
-            if (index < 0)
-                return;
-
-            DB.SettingsTable.SetSetting("lyricsEffect", index.ToString());
-            ApplyEffectPreset(index);
-        }
+        
 
         /// <summary>Пресеты визуального оформления <see cref="BetterLyric"/>.</summary>
         private void ApplyEffectPreset(int index)
