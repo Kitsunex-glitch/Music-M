@@ -35,6 +35,8 @@ using Windows.UI.ViewManagement;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.UI.WindowsAndMessaging;
+using VK_UI3.Views.FullScreen;
+using VK_UI3.Views.ModalsPages;
 using WinRT.Interop;
 
 namespace VK_UI3
@@ -55,6 +57,9 @@ namespace VK_UI3
         public static DownloadFileWithProgress downloadFileWithProgress = null;
 
         private Microsoft.Win32.SafeHandles.SafeFileHandle iIcon;
+
+        private FullScreenPlayerController _fullScreenController;
+        private bool _isFullScreenPlayerActive;
 
         private delegate IntPtr WinProc(HWND hWnd, uint Msg, WPARAM wParam, IntPtr lParam);
         private WinProc newWndProc = null;
@@ -223,6 +228,59 @@ namespace VK_UI3
         {
             SetRegionsForCustomTitleBar();
         }
+
+        #region FullScreen player
+
+        /// <summary>Окно полноэкранного плеера сейчас открыто.</summary>
+        public bool IsFullScreenPlayerActive => _isFullScreenPlayerActive;
+
+        /// <summary>
+        /// Открывает отдельное полноэкранное окно плеера (обложка + управление слева,
+        /// текст песни / очередь справа). Главное окно продолжает работать.
+        /// </summary>
+        public void EnterFullScreenPlayer()
+        {
+            if (_isFullScreenPlayerActive)
+                return;
+
+            _fullScreenController ??= new FullScreenPlayerController();
+            _fullScreenController.Exited -= FullScreenController_Exited;
+            _fullScreenController.Exited += FullScreenController_Exited;
+
+            _isFullScreenPlayerActive = true;
+            _fullScreenController.Enter();
+        }
+
+        /// <summary>Закрывает окно полноэкранного плеера и возвращает текст песни в MainView.</summary>
+        public void ExitFullScreenPlayer()
+        {
+            if (!_isFullScreenPlayerActive)
+                return;
+
+            _isFullScreenPlayerActive = false;
+            _fullScreenController?.Exit();
+        }
+
+        private void FullScreenController_Exited(object sender, EventArgs e)
+        {
+            _isFullScreenPlayerActive = false;
+            if (_fullScreenController != null)
+                _fullScreenController.Exited -= FullScreenController_Exited;
+        }
+
+        /// <summary>Переносит LyricsPage из MainView в окно полноэкранного плеера.</summary>
+        internal bool AttachLyricsToFullScreen(Microsoft.UI.Xaml.Controls.ContentControl host)
+        {
+            return _fullScreenController?.AttachLyrics(host) ?? false;
+        }
+
+        /// <summary>Возвращает LyricsPage из окна полноэкранного плеера в MainView.</summary>
+        internal void DetachLyricsFromFullScreen(Microsoft.UI.Xaml.Controls.ContentControl host)
+        {
+            _fullScreenController?.DetachLyrics(host);
+        }
+
+        #endregion
 
         private void InitializeUIComponents()
         {

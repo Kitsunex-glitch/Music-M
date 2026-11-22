@@ -316,7 +316,14 @@ namespace VK_UI3.Views
         private void CollapseAnimation_Completed(object sender, object e)
         {
             if (LyricPage.Opacity == 0)
+            {
                 LyricPage.Visibility = Visibility.Collapsed;
+
+                // Панель закрыта и не в полноэкранном режиме — останавливаем синхронизацию,
+                // чтобы таймер/загрузка текста не работали вхолостую.
+                if (LyricPage.Parent == MainGridLir)
+                    LyricPage.Disable();
+            }
         }
 
         private async void back(object sender, EventArgs e)
@@ -916,9 +923,12 @@ namespace VK_UI3.Views
 
         public async void CollapseLyricsPanel()
         {
-            ExpandAnimation.Pause();
-            CollapseAnimation.Begin();
-            LyricPage.Disable();
+            this.DispatcherQueue.TryEnqueue(async () =>
+            {
+                ExpandAnimation.Pause();
+                CollapseAnimation.Begin();
+                LyricPage.Disable();
+            });
 
         }
 
@@ -978,6 +988,82 @@ namespace VK_UI3.Views
                 SectionViewPageNowPlayingList.Navigate(typeof(WaitView), waitParameters, new DrillInNavigationTransitionInfo());
             }
         }
+
+        #region FullScreen lyrics reparenting
+
+        // Родитель LyricsPage в MainView (запоминается при переносе в полноэкранный режим).
+        private Panel _lyricsPageHomeParent;
+        private int _lyricsPageHomeRow;
+        private bool _lyricsToolbarWasCollapsed;
+        private bool _lyricsSettingsWasOpen;
+
+        /// <summary>
+        /// Открепляет существующий <see cref="LyricsPage"/> от MainView для показа в полноэкранном режиме.
+        /// Второй экземпляр BetterLyric/таймера не создаётся — переносится тот же контрол.
+        /// </summary>
+        public LyricsPage DetachLyricsPageForFullScreen()
+        {
+            if (LyricPage == null || LyricPage.Parent is not Panel parent)
+                return null;
+
+            _lyricsPageHomeParent = parent;
+            _lyricsPageHomeRow = Grid.GetRow(LyricPage);
+
+            // Синхронизацию в MainView останавливаем: пока страница в полноэкранном окне,
+            // её таймером управляет полноэкранный режим (один BetterLyric — один таймер).
+            _lyricsToolbarWasCollapsed = lyrClosed;
+            LyricPage.Disable();
+
+            // Скрываем тулбар и настройки — в полноэкранном режиме нужен только текст.
+            _lyricsSettingsWasOpen = LyricPage.IsSettingsPaneOpen;
+            LyricPage.SetFullScreenMode(true);
+
+            parent.Children.Remove(LyricPage);
+            return LyricPage;
+        }
+
+        /// <summary>
+        /// Возвращает <see cref="LyricsPage"/> обратно в MainView и восстанавливает оформление.
+        /// </summary>
+        public void AttachLyricsPageBack(LyricsPage page)
+        {
+            if (page == null)
+                return;
+
+            page.SetFullScreenMode(false);
+            page.ClearOpacityOverride();
+
+            var parent = _lyricsPageHomeParent ?? (Panel)LyricPage?.Parent;
+            if (parent != null && page.Parent != parent)
+            {
+                if (page.Parent is Panel oldParent)
+                    oldParent.Children.Remove(page);
+
+                Grid.SetRow(page, _lyricsPageHomeRow);
+                parent.Children.Add(page);
+            }
+
+            // Возвращаемся к обычному режиму MainView.
+            if (_lyricsToolbarWasCollapsed)
+            {
+                // Панель была закрыта до входа в fullscreen — оставляем её свёрнутой и без синхронизации.
+                page.Disable();
+                page.Visibility = Visibility.Collapsed;
+                page.Opacity = 0;
+                lyrClosed = true;
+            }
+            else
+            {
+                // Панель была открыта — продолжаем синхронизацию в MainView.
+                page.Visibility = Visibility.Visible;
+                page.Opacity = 1;
+                page.Enable();
+            }
+
+            _lyricsPageHomeParent = null;
+        }
+
+        #endregion
 
         internal void setNewPlayingList(IVKGetAudio value)
         {

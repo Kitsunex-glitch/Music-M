@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="VK_UI3.Views.FullScreen.FullScreenControls"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:VK_UI3.Views.ModalsPages"
+    xmlns:converters="using:VK_UI3.Converters"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    AutomationProperties.Name="Панель управления полноэкранного плеера"
+    mc:Ignorable="d">
+
+    <!--
+        Разметка контролов полностью повторяет VK UI3/Controllers/AudioPlayer.xaml:
+        те же размеры (35x35 / 40x40), Padding=0, Background=Transparent,
+        размеры иконок (14 / 12), Flyout громкости с SoundSlider, Flyout эквалайзера.
+        Различие — только расположение: строка перемотки над транспортом.
+    -->
+    <UserControl.Resources>
+        <converters:SecondsToTimeConverter x:Key="SecondsToTimeConverter" />
+        <converters:LongToDoubleConverter x:Key="LongToDoubleConverter" />
+    </UserControl.Resources>
+
+    <Grid
+        x:Name="ControlsPanel"
+        Padding="32,14,32,18"
+        Background="{ThemeResource AcrylicInAppFillColorBaseBrush}"
+        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+        BorderThickness="0,1,0,0"
+        CornerRadius="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!--  ================= Строка перемотки (как SliderTrack в AudioPlayer) =================  -->
+        <Grid
+            x:Name="SliderTrack"
+            Grid.Row="0"
+            Margin="0,2,0,10"
+            Background="Transparent"
+            CornerRadius="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock
+                x:Name="PositionText"
+                Grid.Column="0"
+                Margin="16,4,0,4"
+                VerticalAlignment="Center"
+                AutomationProperties.Name="Текущее время воспроизведения"
+                Text="00:00" />
+
+            <Slider
+                x:Name="PositionSlider"
+                Grid.Column="1"
+                Height="30"
+                Margin="8,4,8,4"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Center"
+                AutomationProperties.HelpText="Позволяет перемотать текущий трек. Используйте стрелки влево и вправо."
+                AutomationProperties.Name="Позиция трека"
+                Clip="{x:Null}"
+                Maximum="1"
+                Minimum="0"
+                PointerEntered="PositionSlider_PointerEntered"
+                PointerExited="PositionSlider_PointerExited"
+                StepFrequency="1"
+                ThumbToolTipValueConverter="{StaticResource SecondsToTimeConverter}"
+                ValueChanged="PositionSlider_ValueChanged" />
+
+            <TextBlock
+                x:Name="DurationText"
+                Grid.Column="2"
+                Margin="0,4,16,4"
+                VerticalAlignment="Center"
+                Text="00:00" />
+        </Grid>
+
+        <!--  ================= Транспорт и действия (как основная панель AudioPlayer) =================  -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!--  Левая группа: like (в мини-плеере нет — добавлен как отдельная кнопка)  -->
+            <StackPanel
+                Grid.Column="0"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Center"
+                Orientation="Horizontal" />
+
+            <!--  Центр: repeat / prev / play / next / volume — ровно как в AudioPlayer  -->
+            <StackPanel
+                Grid.Column="1"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Orientation="Horizontal">
+
+                <Button
+                    x:Name="RepeatButton"
+                    Width="35"
+                    Height="35"
+                    Margin="0,0,8,0"
+                    Padding="0"
+                    AutomationProperties.HelpText="Переключает режим: повтор одного трека, повтор всех треков, перемешать"
+                    AutomationProperties.Name="Режим воспроизведения"
+                    Background="Transparent"
+                    Click="RepeatButton_Click">
+                    <FontIcon
+                        x:Name="RepeatIcon"
+                        FontSize="14"
+                        Glyph="&#xE8EE;" />
+                </Button>
+
+                <Button
+                    x:Name="PreviousButton"
+                    Width="35"
+                    Height="35"
+                    Padding="0"
+                    AutomationProperties.HelpText="Переходит к предыдущему треку"
+                    AutomationProperties.Name="Предыдущий трек"
+                    Background="Transparent"
+                    Click="PreviousButton_Click"
+                    FocusVisualPrimaryBrush="Transparent"
+                    FocusVisualSecondaryThickness="0">
+                    <FontIcon FontSize="12" Glyph="&#xE100;" />
+                </Button>
+
+                <Button
+                    x:Name="PlayPauseButton"
+                    Width="40"
+                    Height="40"
+                    Margin="8,0,8,0"
+                    Padding="0"
+                    AutomationProperties.HelpText="Запускает или останавливает воспроизведение текущего трека"
+                    AutomationProperties.Name="Воспроизвести"
+                    Background="Transparent"
+                    Click="PlayPauseButton_Click">
+                    <FontIcon
+                        x:Name="PlayPauseIcon"
+                        FontSize="14"
+                        Glyph="&#xE768;" />
+                </Button>
+
+                <Button
+                    x:Name="NextButton"
+                    Width="35"
+                    Height="35"
+                    Margin="0,0,8,0"
+                    Padding="0"
+                    AutomationProperties.HelpText="Переходит к следующему треку"
+                    AutomationProperties.Name="Следующий трек"
+                    Background="Transparent"
+                    Click="NextButton_Click">
+                    <FontIcon FontSize="12" Glyph="&#xE101;" />
+                </Button>
+
+                <Button
+                    x:Name="MuteButton"
+                    Width="35"
+                    Height="35"
+                    Padding="0"
+                    AutomationProperties.HelpText="Открывает регулятор громкости"
+                    AutomationProperties.Name="Громкость"
+                    Background="Transparent">
+                    <FontIcon
+                        x:Name="MuteIcon"
+                        FontSize="14"
+                        Glyph="&#xE995;" />
+                    <Button.Flyout>
+                        <Flyout>
+                            <Grid Height="27" Margin="-15">
+                                <Slider
+                                    x:Name="SoundSlider"
+                                    Width="150"
+                                    Margin="10,-1,10,0"
+                                    VerticalAlignment="Top"
+                                    AutomationProperties.HelpText="Регулирует громкость воспроизведения. Используйте стрелки влево и вправо."
+                                    AutomationProperties.Name="Громкость"
+                                    Background="AliceBlue"
+                                    Minimum="0"
+                                    Orientation="Horizontal"
+                                    PointerEntered="SoundSlider_PointerEntered"
+                                    PointerExited="SoundSlider_PointerExited"
+                                    StepFrequency="1"
+                                    ValueChanged="SoundSlider_ValueChanged" />
+                            </Grid>
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
+            </StackPanel>
+
+            <!--  Правая группа: эквалайзер, очередь, меню трека, закрыть — как в AudioPlayer  -->
+            <StackPanel
+                Grid.Column="2"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Center"
+                Orientation="Horizontal">
+                <Button
+                    x:Name="EqualizerButton"
+                    Width="30"
+                    Height="30"
+                    Margin="8,0,0,0"
+                    Padding="0"
+                    AutomationProperties.Name="Эквалайзер"
+                    Background="Transparent">
+                    <FontIcon Glyph="&#xE9E9;" />
+                    <ToolTipService.ToolTip>
+                        <ToolTip Content="Эквалайзер" />
+                    </ToolTipService.ToolTip>
+                    <Button.Flyout>
+                        <Flyout>
+                            <Flyout.FlyoutPresenterStyle>
+                                <Style TargetType="FlyoutPresenter">
+                                    <Setter Property="MaxWidth" Value="4000" />
+                                    <Setter Property="MaxHeight" Value="6000" />
+                                    <Setter Property="CornerRadius" Value="8" />
+                                    <Setter Property="Padding" Value="0" />
+                                </Style>
+                            </Flyout.FlyoutPresenterStyle>
+                            <controls:EqualizerControlPage />
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
+
+                <!--  Трансляция в статус ВК — как TranslatetoStatus в AudioPlayer  -->
+                <Button
+                    x:Name="StatusButton"
+                    Width="30"
+                    Height="30"
+                    Margin="8,0,8,0"
+                    Padding="-2,-2,0,0"
+                    AutomationProperties.Name="Транслировать в статус ВК"
+                    Background="Transparent"
+                    Click="StatusButton_Click">
+                    <FontIcon
+                        x:Name="StatusIcon"
+                        FontSize="12"
+                        Glyph="&#xEB5E;" />
+                    <ToolTipService.ToolTip>
+                        <ToolTip Content="Транслировать в статус ВК" />
+                    </ToolTipService.ToolTip>
+                </Button>
+
+                <Button
+                    x:Name="MoreButton"
+                    Width="30"
+                    Height="30"
+                    Padding="0"
+                    AutomationProperties.Name="Действия с треком"
+                    Background="Transparent"
+                    Click="MoreButton_Click">
+                    <FontIcon Glyph="&#xE712;" />
+                </Button>
+
+                <Button
+                    x:Name="CloseButton"
+                    Width="30"
+                    Height="30"
+                    Margin="8,0,0,0"
+                    Padding="0"
+                    AutomationProperties.HelpText="Выходит из полноэкранного режима"
+                    AutomationProperties.Name="Закрыть полноэкранный режим"
+                    Background="Transparent"
+                    Click="CloseButton_Click">
+                    <FontIcon FontSize="14" Glyph="&#xE740;" />
+                    <ToolTipService.ToolTip>
+                        <ToolTip Content="Выйти из полноэкранного режима (Esc)" />
+                    </ToolTipService.ToolTip>
+                </Button>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

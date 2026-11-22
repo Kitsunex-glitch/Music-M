@@ -388,6 +388,15 @@ namespace VK_UI3.Controllers
             // Open equalizer dialog
         }
 
+        private void fullScreenBTN_Tapped(object sender, TappedRoutedEventArgs e)
+        {
+            // Включаем полноэкранный режим только если есть активный источник воспроизведения.
+            if (VK_UI3.Services.MediaPlayerService.iVKGetAudio == null)
+                return;
+
+            MainWindow.mainWindow?.EnterFullScreenPlayer();
+        }
+
         #endregion
 
         #region Slider Events

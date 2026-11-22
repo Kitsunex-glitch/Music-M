@@ -463,6 +463,15 @@
         <Page Update="Views\SectionView.xaml">
             <Generator>MSBuild:Compile</Generator>
         </Page>
+        <Page Update="Views\FullScreen\FullScreenPlayerWindow.xaml">
+            <Generator>MSBuild:Compile</Generator>
+        </Page>
+        <Page Update="Views\FullScreen\FullScreenControls.xaml">
+            <Generator>MSBuild:Compile</Generator>
+        </Page>
+        <Page Update="Views\FullScreen\FullScreenQueuePane.xaml">
+            <Generator>MSBuild:Compile</Generator>
+        </Page>
     </ItemGroup>
 
     <ItemGroup>
