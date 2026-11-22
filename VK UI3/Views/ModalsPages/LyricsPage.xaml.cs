@@ -1,7 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Media;
 using MusicX.Core.Models;
 using MusicX.Core.Services;
 using MvvmHelpers;
@@ -54,6 +56,14 @@ namespace VK_UI3.Views.ModalsPages
         private VkNet.Model.Attachments.Audio _currentTrack;
         private DispatcherTimer _timer;
         private bool _disposed;
+
+        /// <summary>
+        /// Разрешение на работу синхронизации. Таймер, позиция и загрузка текста
+        /// выполняются ТОЛЬКО когда страница явно включена через <see cref="Enable"/>
+        /// (панель открыта или страница показана в полноэкранном плеере).
+        /// Репарент/навигация сами по себе синхронизацию не запускают.
+        /// </summary>
+        private bool _isActive;
 
         private readonly List<string> _plainTexts = new();
         private LyricData _lyricsData;
@@ -114,11 +124,19 @@ namespace VK_UI3.Views.ModalsPages
 
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
-            // LoadSettingsToControls теперь всегда пишет в LyricsView — и при первом
-            // запуске (дефолты), и при последующих (сохранённые значения).
+            // Настройки отображения применяем всегда — они влияют только на вид.
             ApplySavedSettings(force: true);
 
-            InitializeTimer();
+            // Синхронизацию НЕ запускаем автоматически: страница может быть загружена
+            // при репарент/навигации, хотя панель текста закрыта. Таймер и загрузка
+            // текста стартуют исключительно по явному Enable().
+            if (!_isActive)
+            {
+                LyricsView.CurrentIsPlaying = false;
+                return;
+            }
+
+            EnsureTimerStarted();
             _currentTrack = Track;
             LyricsView.CurrentIsPlaying = IsPlayerPlaying();
             _ = LoadLyricsAsync();
@@ -126,8 +144,18 @@ namespace VK_UI3.Views.ModalsPages
 
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
-            DisposeTimer();
+            // Останавливаем таймер, но не «убиваем» страницу: она может быть
+            // перенесена в другое окно (полноэкранный плеер) и снова загружена.
+            _timer?.Stop();
             _disposed = true;
+        }
+
+        private void EnsureTimerStarted()
+        {
+            if (_timer == null)
+                InitializeTimer();
+            _disposed = false;
+            _timer?.Start();
         }
 
         private static bool IsPlayerPlaying()
@@ -161,7 +189,8 @@ namespace VK_UI3.Views.ModalsPages
 
         private async void OnTimerTick(object sender, object e)
         {
-            if (_disposed)
+            // Никакой работы, пока страница не активна (панель закрыта и не в fullscreen).
+            if (_disposed || !_isActive)
                 return;
 
             if (Track == null)
@@ -202,15 +231,138 @@ namespace VK_UI3.Views.ModalsPages
 
         public void Enable()
         {
-            _timer?.Start();
+            _isActive = true;
+
+            // Если страница выгружалась (репарент/навигация), таймер мог быть освобождён.
+            EnsureTimerStarted();
+
+            // Обратное включение после Disable(): снова разрешаем отрисовку кадров.
+            LyricsView.IsLyricsVisible = true;
             LyricsView.CurrentIsPlaying = IsPlayerPlaying();
+
+            // ВАЖНО: при репарент в полноэкранный режим OnLoaded уже отработал раньше,
+            // когда страница была неактивна, поэтому текст для текущего трека ещё не загружен.
+            // Таймер грузит текст только при СМЕНЕ трека — без явной загрузки здесь
+            // в полноэкранном режиме был бы пустой экран.
+            if (Track != null && (_currentTrack?.Id != Track.Id || _currentTrack?.OwnerId != Track.OwnerId))
+            {
+                _currentTrack = Track;
+                _ = LoadLyricsAsync();
+            }
         }
 
         public void Disable()
         {
+            _isActive = false;
             _timer?.Stop();
+
+            // Полное выключение текста: контрол перестаёт обновлять кадры
+            // (кадровый цикл, подсветка, скролл). Раньше останавливался только
+            // таймер позиции, а Win2D продолжал рисовать на каждом тике — панель
+            // закрыта, но текст продолжал «жить».
             LyricsView.CurrentIsPlaying = false;
+            LyricsView.IsLyricsVisible = false;
         }
+
+        /// <summary>Синхронизация сейчас активна.</summary>
+        public bool IsActive => _isActive;
+
+        /// <summary>
+        /// Переключает страницу в режим показа внутри полноэкранного плеера:
+        /// скрывает тулбар/настройки, убирает фон и уменьшает внутренние отступы.
+        /// </summary>
+        public void SetFullScreenMode(bool isFullScreen)
+        {
+            if (ToolbarPanel != null)
+                ToolbarPanel.Visibility = isFullScreen ? Visibility.Collapsed : Visibility.Visible;
+
+            if (isFullScreen)
+            {
+                // В MainView страница лежит с Opacity=0 и Visibility=Collapsed (её показывает
+                // анимация панели). После переноса в полноэкранный хост эти значения
+                // сохраняются — без сброса текст остаётся невидимым. Opacity задаём явно (=1),
+                // а не ClearValue: анимация MainView могла снова выставить 0.
+                this.Visibility = Visibility.Visible;
+                this.Opacity = 1;
+
+                if (IsSettingsPaneOpen)
+                    CloseSettings();
+
+                if (LyricsStageGrid != null)
+                {
+                    LyricsStageGrid.Margin = new Thickness(0);
+                    LyricsStageGrid.CornerRadius = new CornerRadius(0);
+                }
+
+                // ВАЖНО: именно Transparent, а не null. Акриловая кисть без SystemBackdrop
+                // у окна рендерится как сплошная непрозрачная заливка и «съедает» всё под
+                // страницей (фон/обложку). null мог унаследовать значение от Page-стиля.
+                this.Background = new SolidColorBrush(Colors.Transparent);
+
+                // Канвас теперь на CanvasControl — он поддерживает альфа-канал,
+                // поэтому фон рисует не он, а сама страница (панель правой половины окна).
+                // Держим канвас прозрачным: текст ложится прямо на фон панели.
+                LyricsView.CanvasBackgroundColor = Windows.UI.Color.FromArgb(0, 0, 0, 0);
+            }
+            else
+            {
+                // Возвращаем управление оформлением MainView (его анимации снова зададут
+                // Opacity/Visibility при открытии/закрытии панели).
+                this.ClearValue(OpacityProperty);
+                this.ClearValue(VisibilityProperty);
+
+                // В обычном режиме фон канваса снова прозрачный (фон даёт MainView).
+                LyricsView.CanvasBackgroundColor = Windows.UI.Color.FromArgb(0, 0, 0, 0);
+
+                if (LyricsStageGrid != null)
+                {
+                    LyricsStageGrid.Margin = new Thickness(20);
+                    LyricsStageGrid.CornerRadius = new CornerRadius(10);
+                }
+
+                this.Background = Application.Current.Resources["AcrylicInAppFillColorBaseBrush"]
+                    as Microsoft.UI.Xaml.Media.Brush;
+            }
+        }
+
+        /// <summary>Названия источников текста (индекс = <c>GeniusToggle.SelectedIndex</c>).</summary>
+        public static readonly string[] LyricsSourceNames = { "Auto", "VK", "Genius", "LRCLib" };
+
+        /// <summary>Текущий выбранный индекс источника текста.</summary>
+        public int LyricsSourceIndex => GeniusToggle?.SelectedIndex ?? 0;
+
+        /// <summary>
+        /// Меняет источник текста и перезагружает его. Используется панелью
+        /// полноэкранного плеера (выбор источника прямо на экране).
+        /// </summary>
+        public void SetLyricsSource(int index)
+        {
+            if (GeniusToggle == null || index < 0 || index >= GeniusToggle.Items.Count)
+                return;
+
+            if (GeniusToggle.SelectedIndex == index)
+                return;
+
+            GeniusToggle.SelectedIndex = index;
+        }
+
+        /// <summary>Открывает панель настроек текста (если ещё не открыта).</summary>
+        public void OpenSettingsPane()
+        {
+            if (IsSettingsPaneOpen)
+                return;
+
+            OpenSettings();
+        }
+
+        /// <summary>Снимает локально установленную прозрачность (возвращает управление анимациям MainView).</summary>
+        public void ClearOpacityOverride()
+        {
+            this.ClearValue(OpacityProperty);
+        }
+
+        /// <summary>Открыта ли панель настроек отображения текста.</summary>
+        public bool IsSettingsPaneOpen => SettingsPane?.Visibility == Visibility.Visible;
 
         #endregion
 
@@ -1032,6 +1184,211 @@ namespace VK_UI3.Views.ModalsPages
             Bindings.Update();
         }
 
+        // ---- Цвета ----
+
+        /// <summary>Цвет в настройках хранится строкой ARGB (#AARRGGBB).</summary>
+        private static string ColorToSetting(Windows.UI.Color color)
+            => $"#{color.A:X2}{color.R:X2}{color.G:X2}{color.B:X2}";
+
+        private static Windows.UI.Color ReadColor(string key, Windows.UI.Color fallback)
+        {
+            var setting = DB.SettingsTable.GetSetting(SettingsPrefix + key, null);
+            return TryParseColor(setting?.settingValue, out var color) ? color : fallback;
+        }
+
+        private static bool TryParseColor(string text, out Windows.UI.Color color)
+        {
+            color = Microsoft.UI.Colors.White;
+
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
+
+            var raw = text.Trim().TrimStart('#');
+
+            // Поддержка форматов #RRGGBB и #AARRGGBB.
+            if (raw.Length == 6)
+                raw = "FF" + raw;
+
+            if (raw.Length != 8
+                || !byte.TryParse(raw.Substring(0, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var a)
+                || !byte.TryParse(raw.Substring(2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var r)
+                || !byte.TryParse(raw.Substring(4, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var g)
+                || !byte.TryParse(raw.Substring(6, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var b))
+            {
+                return false;
+            }
+
+            color = Windows.UI.Color.FromArgb(a, r, g, b);
+            return true;
+        }
+
+        private static Windows.UI.Color ApplyColor(string key, Windows.UI.Color fallback,
+            Action<Windows.UI.Color> apply)
+        {
+            var value = ReadColor(key, fallback);
+            apply(value);
+            return value;
+        }
+
+        private static void SetSwatch(Microsoft.UI.Xaml.Controls.Border swatch, Windows.UI.Color color)
+        {
+            if (swatch == null)
+                return;
+
+            swatch.Background = new SolidColorBrush(color);
+        }
+
+        /// <summary>
+        /// Открывает палитру для выбора цвета. Возвращает выбранный цвет
+        /// (или null, если пользователь отменил выбор).
+        /// </summary>
+        private async Task<Windows.UI.Color?> PickColorAsync(Windows.UI.Color current)
+        {
+            var picker = new ColorPicker
+            {
+                Color = current,
+                IsAlphaEnabled = false,
+                IsColorChannelTextInputVisible = true,
+                IsHexInputVisible = true,
+                IsAlphaSliderVisible = false,
+                IsMoreButtonVisible = false
+            };
+
+            var dialog = new ContentDialog
+            {
+                XamlRoot = this.XamlRoot,
+                Title = "Цвет текста песни",
+                Content = picker,
+                PrimaryButtonText = "Применить",
+                CloseButtonText = "Отмена",
+                DefaultButton = ContentDialogButton.Primary
+            };
+
+            var result = await dialog.ShowAsync();
+            return result == ContentDialogResult.Primary ? picker.Color : null;
+        }
+
+        private async void TextColorButton_Click(object sender, RoutedEventArgs e)
+        {
+            var picked = await PickColorAsync(LyricsView.LyricsTextColor);
+            if (picked is not { } color)
+                return;
+
+            LyricsView.LyricsTextColor = color;
+            SetSwatch(TextColorSwatch, color);
+            SaveSetting("textColor", ColorToSetting(color));
+        }
+
+        private async void StrokeColorButton_Click(object sender, RoutedEventArgs e)
+        {
+            var picked = await PickColorAsync(LyricsView.LyricsStrokeColor);
+            if (picked is not { } color)
+                return;
+
+            LyricsView.LyricsStrokeColor = color;
+            SetSwatch(StrokeColorSwatch, color);
+            SaveSetting("strokeColor", ColorToSetting(color));
+        }
+
+        private async void GlowColorButton_Click(object sender, RoutedEventArgs e)
+        {
+            var picked = await PickColorAsync(LyricsView.LyricsGlowColor);
+            if (picked is not { } color)
+                return;
+
+            LyricsView.LyricsGlowColor = color;
+            SetSwatch(GlowColorSwatch, color);
+            SaveSetting("glowColor", ColorToSetting(color));
+        }
+
+        // ---- Шрифт ----
+
+        /// <summary>
+        /// Все семейства, которые умеет рисовать Win2D (то есть реально доступные системе).
+        /// Заполняется один раз лениво: перечисление шрифтов небесплатно.
+        /// </summary>
+        private static string[] _systemFontFamilies;
+
+        private static string[] GetSystemFontFamilies()
+        {
+            if (_systemFontFamilies != null)
+                return _systemFontFamilies;
+
+            try
+            {
+                _systemFontFamilies = Microsoft.Graphics.Canvas.Text.CanvasTextFormat
+                    .GetSystemFontFamilies()
+                    .OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase)
+                    .ToArray();
+            }
+            catch (Exception ex)
+            {
+                BetterLyricDebugLog.WriteAlways(
+                    BetterLyricLogCategory.Data,
+                    $"GetSystemFontFamilies: не удалось получить список — {ex.GetType().Name}: {ex.Message}");
+
+                // Минимум, который точно отрисуется.
+                _systemFontFamilies = new[] { "Segoe UI", "Arial", "Tahoma", "Times New Roman" };
+            }
+
+            return _systemFontFamilies;
+        }
+
+        /// <summary>Применяет семейство шрифта к тексту песни (и западные, и CJK-символы).</summary>
+        private void ApplyFontFamily(string familyName)
+        {
+            if (string.IsNullOrWhiteSpace(familyName))
+                return;
+
+            familyName = familyName.Trim();
+
+            LyricsView.LyricsWesternFontFamily = familyName;
+            LyricsView.LyricsCJKFontFamily = familyName;
+
+            if (FontFamilyBox.Text != familyName)
+                FontFamilyBox.Text = familyName;
+        }
+
+        /// <summary>Подставляет подсказки по мере ввода.</summary>
+        private void FontFamilyBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
+        {
+            // Интересует только ввод пользователя, а не программная установка Text.
+            if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput)
+                return;
+
+            var query = sender.Text?.Trim() ?? string.Empty;
+
+            var matches = string.IsNullOrEmpty(query)
+                ? GetSystemFontFamilies()
+                : GetSystemFontFamilies()
+                    .Where(name => name.Contains(query, StringComparison.CurrentCultureIgnoreCase))
+                    .ToArray();
+
+            sender.ItemsSource = matches;
+        }
+
+        private void FontFamilyBox_SuggestionChosen(AutoSuggestBox sender, AutoSuggestBoxSuggestionChosenEventArgs args)
+        {
+            if (args.SelectedItem is not string familyName)
+                return;
+
+            sender.Text = familyName;
+            ApplyFontFamily(familyName);
+            SaveSetting("fontFamily", familyName);
+        }
+
+        private void FontFamilyBox_QuerySubmitted(AutoSuggestBox sender, AutoSuggestBoxQuerySubmittedEventArgs args)
+        {
+            // Выбрали подсказку — берём её; иначе применяем введённый текст как имя семейства.
+            var familyName = (args.ChosenSuggestion as string) ?? args.QueryText;
+
+            if (string.IsNullOrWhiteSpace(familyName))
+                return;
+
+            ApplyFontFamily(familyName);
+            SaveSetting("fontFamily", familyName.Trim());
+        }
+
         private static double ApplyNumber(string key, double fallback, Action<double> apply)
         {
             var setting = DB.SettingsTable.GetSetting(SettingsPrefix + key, null);
@@ -1123,12 +1480,19 @@ namespace VK_UI3.Views.ModalsPages
             {
                 var v = LyricsView;
 
-                v.LyricsAlignmentType = LyricsTextAlignmentType.Left;
+                v.LyricsAlignmentType = LyricsTextAlignmentType.Center;
+                v.LyricsTextColor = Microsoft.UI.Colors.White;
+                v.LyricsStrokeColor = Microsoft.UI.Colors.White;
+                v.LyricsGlowColor = Microsoft.UI.Colors.White;
                 v.LyricsLineContentOrientation = LyricsContentOrientation.Vertical;
                 v.AutoWrap = true;
                 v.PlayingLineTopOffset = 45;
                 v.LyricsLineOverallSpacingFactor = 0.6;
                 v.LyricsLineInnerSpacingFactor = 0.1;
+
+                v.LyricsWesternFontFamily = LyricSettingsDefaults.FontFamily;
+                v.LyricsCJKFontFamily = LyricSettingsDefaults.FontFamily;
+                FontFamilyBox.Text = LyricSettingsDefaults.FontFamily;
 
                 v.LyricsFontWeight = LyricFontWeight.SemiBold;
                 v.OriginalLyricsFontSize = 24;
@@ -1236,7 +1600,29 @@ namespace VK_UI3.Views.ModalsPages
             InnerSpacingSlider.Value = ApplyNumber("innerSpacing", LyricSettingsDefaults.InnerSpacing,
                 x => v.LyricsLineInnerSpacingFactor = x);
 
+            // ---- Цвета ----
+            var textColor = ApplyColor("textColor", LyricSettingsDefaults.TextColor,
+                x => v.LyricsTextColor = x);
+            SetSwatch(TextColorSwatch, textColor);
+
+            var strokeColor = ApplyColor("strokeColor", LyricSettingsDefaults.StrokeColor,
+                x => v.LyricsStrokeColor = x);
+            SetSwatch(StrokeColorSwatch, strokeColor);
+
+            var glowColor = ApplyColor("glowColor", LyricSettingsDefaults.GlowColor,
+                x => v.LyricsGlowColor = x);
+            SetSwatch(GlowColorSwatch, glowColor);
+
             // ---- Шрифт ----
+            var savedFontFamily = DB.SettingsTable.GetSetting(SettingsPrefix + "fontFamily", null)?.settingValue;
+
+            if (string.IsNullOrWhiteSpace(savedFontFamily))
+                savedFontFamily = LyricSettingsDefaults.FontFamily;
+
+            FontFamilyBox.Text = savedFontFamily;
+            v.LyricsWesternFontFamily = savedFontFamily;
+            v.LyricsCJKFontFamily = savedFontFamily;
+
             FontWeightCombo.SelectedItem = ApplyEnum("fontWeight", LyricSettingsDefaults.FontWeight,
                 x => v.LyricsFontWeight = x);
 
@@ -1994,6 +2380,7 @@ namespace VK_UI3.Views.ModalsPages
         private static readonly string[] SettingsKeys =
         {
             "alignment", "orientation", "autowrap", "topOffset", "overallSpacing", "innerSpacing",
+            "textColor", "strokeColor", "glowColor", "fontFamily",
             "fontWeight", "fontSize", "translatedFontSize", "dynamicFontSize", "strokeWidth", "rtl",
             "playedOpacity", "unplayedOpacity", "translatedOpacity",
             "wordByWord", "blur", "fadeOut", "outOfSight",
@@ -2121,7 +2508,14 @@ namespace VK_UI3.Views.ModalsPages
     /// </summary>
     public static class LyricSettingsDefaults
     {
-        public const LyricsTextAlignmentType Alignment = LyricsTextAlignmentType.Left;
+        public const LyricsTextAlignmentType Alignment = LyricsTextAlignmentType.Center;
+
+        public const string FontFamily = "Segoe UI";
+
+        public static readonly Windows.UI.Color TextColor = Microsoft.UI.Colors.White;
+        public static readonly Windows.UI.Color StrokeColor = Microsoft.UI.Colors.White;
+        public static readonly Windows.UI.Color GlowColor = Microsoft.UI.Colors.White;
+
         public const LyricsContentOrientation Orientation = LyricsContentOrientation.Vertical;
         public const bool AutoWrap = true;
         public const double TopOffset = 45;
