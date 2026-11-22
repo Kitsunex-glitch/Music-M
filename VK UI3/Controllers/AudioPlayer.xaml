@@ -1,449 +1,466 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
 <Page
-	x:Class="VK_UI3.Controllers.AudioPlayer"
-	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-	xmlns:constrols="using:VK_UI3.Controls"
-	xmlns:controls="using:VK_UI3.Views.ModalsPages"
-	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-	xmlns:helpers="using:VK_UI3.Helpers"
-	xmlns:local1="using:VK_UI3.Converters"
-	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-	x:Name="pageRa"
-	Clip="{x:Null}"
-	IsEnabled="True"
-	PointerEntered="Page_PointerEntered"
-	PointerExited="Page_PointerExited"
-	mc:Ignorable="d">
+    x:Class="VK_UI3.Controllers.AudioPlayer"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:constrols="using:VK_UI3.Controls"
+    xmlns:controls="using:VK_UI3.Views.ModalsPages"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:helpers="using:VK_UI3.Helpers"
+    xmlns:local1="using:VK_UI3.Converters"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    x:Name="pageRa"
+    Clip="{x:Null}"
+    IsEnabled="True"
+    PointerEntered="Page_PointerEntered"
+    PointerExited="Page_PointerExited"
+    mc:Ignorable="d">
 
-	<Page.Resources>
-		<ThemeShadow x:Name="SharedShadow" />
-		<local1:SecondsToTimeConverter x:Key="SecondsToTimeConverter" />
-		<local1:LongToDoubleConverter x:Key="LongToDoubleConverter" />
-		<Storyboard x:Key="SliderTrackMoveUp">
-			<DoubleAnimation
-				Storyboard.TargetName="sliderTrackGridUP"
-				Storyboard.TargetProperty="(Canvas.Top)"
-				To="-55"
-				Duration="0:0:0.3" />
-			<DoubleAnimation
-				BeginTime="0:0:0.2"
-				Storyboard.TargetName="sliderTrackGridUP"
-				Storyboard.TargetProperty="Opacity"
-				To="1"
-				Duration="0:0:0.1" />
-		</Storyboard>
-		<Storyboard x:Key="SliderTrackMoveDown">
-			<DoubleAnimation
-				Storyboard.TargetName="sliderTrackGridUP"
-				Storyboard.TargetProperty="(Canvas.Top)"
-				To="0"
-				Duration="0:0:0.3" />
-			<DoubleAnimation
-				BeginTime="0:0:0.0"
-				Storyboard.TargetName="sliderTrackGridUP"
-				Storyboard.TargetProperty="Opacity"
-				To="0"
-				Duration="0:0:0.1" />
-		</Storyboard>
-	</Page.Resources>
+    <Page.Resources>
+        <ThemeShadow x:Name="SharedShadow" />
+        <local1:SecondsToTimeConverter x:Key="SecondsToTimeConverter" />
+        <local1:LongToDoubleConverter x:Key="LongToDoubleConverter" />
+        <Storyboard x:Key="SliderTrackMoveUp">
+            <DoubleAnimation
+                Storyboard.TargetName="sliderTrackGridUP"
+                Storyboard.TargetProperty="(Canvas.Top)"
+                To="-55"
+                Duration="0:0:0.3" />
+            <DoubleAnimation
+                BeginTime="0:0:0.2"
+                Storyboard.TargetName="sliderTrackGridUP"
+                Storyboard.TargetProperty="Opacity"
+                To="1"
+                Duration="0:0:0.1" />
+        </Storyboard>
+        <Storyboard x:Key="SliderTrackMoveDown">
+            <DoubleAnimation
+                Storyboard.TargetName="sliderTrackGridUP"
+                Storyboard.TargetProperty="(Canvas.Top)"
+                To="0"
+                Duration="0:0:0.3" />
+            <DoubleAnimation
+                BeginTime="0:0:0.0"
+                Storyboard.TargetName="sliderTrackGridUP"
+                Storyboard.TargetProperty="Opacity"
+                To="0"
+                Duration="0:0:0.1" />
+        </Storyboard>
+    </Page.Resources>
 
-	<Grid
-		x:Name="RootGrid"
-		Padding="0"
-		Clip="{x:Null}">
-		<!--  FlyOutControl как скрытый элемент для доступа из кода  -->
-		<Grid.ContextFlyout>
-			<constrols:AudioControlFlyOut x:Name="FlyOutControl" />
-		</Grid.ContextFlyout>
+    <Grid
+        x:Name="RootGrid"
+        Padding="0"
+        Clip="{x:Null}">
+        <!--  FlyOutControl как скрытый элемент для доступа из кода  -->
+        <Grid.ContextFlyout>
+            <constrols:AudioControlFlyOut x:Name="FlyOutControl" />
+        </Grid.ContextFlyout>
 
-		<Canvas
-			x:Name="MyCanvas"
-			Height="50"
-			VerticalAlignment="Top">
-			<Grid
-				x:Name="sliderTrackGridUP"
-				Canvas.Left="0"
-				Canvas.Top="-0"
-				Width="{Binding ActualWidth, ElementName=RootGrid, Mode=OneWay}"
-				Padding="10"
-				HorizontalAlignment="Stretch"
-				VerticalAlignment="Stretch"
-				Background="Transparent"
-				Opacity="0">
+        <Canvas
+            x:Name="MyCanvas"
+            Height="50"
+            VerticalAlignment="Top">
+            <Grid
+                x:Name="sliderTrackGridUP"
+                Canvas.Left="0"
+                Canvas.Top="-0"
+                Width="{Binding ActualWidth, ElementName=RootGrid, Mode=OneWay}"
+                Padding="10"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
+                Background="Transparent"
+                Opacity="0">
 
-				<Grid
-					x:Name="SliderTrack"
-					HorizontalAlignment="Stretch"
-					VerticalAlignment="Stretch"
-					Background="{ThemeResource AcrylicInAppFillColorBaseBrush}"
-					CornerRadius="8">
-					<Grid.ColumnDefinitions>
+                <Grid
+                    x:Name="SliderTrack"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch"
+                    Background="{ThemeResource AcrylicInAppFillColorBaseBrush}"
+                    CornerRadius="8">
+                    <Grid.ColumnDefinitions>
 
-						<ColumnDefinition Width="Auto" />
-						<ColumnDefinition Width="*" />
-						<ColumnDefinition Width="Auto" />
-					</Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
 
-					<TextBlock
-						x:Name="textBlock"
-						Grid.Column="0"
-						Margin="16,4,0,4"
-						VerticalAlignment="Center"
-						Text="{x:Bind TrackPositionMs, Mode=OneWay, Converter={StaticResource SecondsToTimeConverter}}"
-						AutomationProperties.Name="Текущее время воспроизведения" />
+                    <TextBlock
+                        x:Name="textBlock"
+                        Grid.Column="0"
+                        Margin="16,4,0,4"
+                        VerticalAlignment="Center"
+                        AutomationProperties.Name="Текущее время воспроизведения"
+                        Text="{x:Bind TrackPositionMs, Mode=OneWay, Converter={StaticResource SecondsToTimeConverter}}" />
 
-					<Slider
-						x:Name="VolumeSlider"
-						Grid.Row="0"
-						Grid.Column="1"
-						Height="30"
-						Margin="8,4,8,4"
-						HorizontalAlignment="Stretch"
-						VerticalAlignment="Center"
-						Clip="{x:Null}"
-						AutomationProperties.Name="Позиция трека"
-						AutomationProperties.HelpText="Позволяет перемотать текущий трек. Используйте стрелки влево и вправо."
-						Maximum="{x:Bind TrackDurationMs, Mode=TwoWay, Converter={StaticResource LongToDoubleConverter}}"
-						Minimum="0"
-						PointerEntered="VolumeSlider_PointerEntered"
-						PointerExited="VolumeSlider_PointerExited"
-						StepFrequency="1"
-						ThumbToolTipValueConverter="{StaticResource SecondsToTimeConverter}"
-						ValueChanged="VolumeSlider_ValueChanged"
-						Value="{x:Bind SliderPositionMs, Mode=TwoWay, Converter={StaticResource LongToDoubleConverter}}" />
-					<TextBlock
-						Grid.Column="2"
-						Margin="0,4,16,4"
-						VerticalAlignment="Center"
-						Text="{x:Bind TrackDurationMs, Mode=OneWay, Converter={StaticResource SecondsToTimeConverter}}" />
-
-
-				</Grid>
-			</Grid>
-		</Canvas>
-		<Grid
-			HorizontalAlignment="Stretch"
-			VerticalAlignment="Stretch"
-			Background="Transparent" />
-		<Rectangle
-			x:Name="RedRectangle"
-			Width="100"
-			Height="Auto"
-			HorizontalAlignment="Left"
-			Fill="{ThemeResource AccentAAFillColorDisabledBrush}" />
-		<!--  Основной контент  -->
-		<Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-			<Grid.ColumnDefinitions>
-				<ColumnDefinition Width="75" />
-				<ColumnDefinition Width="150" />
-				<ColumnDefinition Width="*" />
-				<ColumnDefinition Width="225" />
-			</Grid.ColumnDefinitions>
+                    <Slider
+                        x:Name="VolumeSlider"
+                        Grid.Row="0"
+                        Grid.Column="1"
+                        Height="30"
+                        Margin="8,4,8,4"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Center"
+                        AutomationProperties.HelpText="Позволяет перемотать текущий трек. Используйте стрелки влево и вправо."
+                        AutomationProperties.Name="Позиция трека"
+                        Clip="{x:Null}"
+                        Maximum="{x:Bind TrackDurationMs, Mode=TwoWay, Converter={StaticResource LongToDoubleConverter}}"
+                        Minimum="0"
+                        PointerEntered="VolumeSlider_PointerEntered"
+                        PointerExited="VolumeSlider_PointerExited"
+                        StepFrequency="1"
+                        ThumbToolTipValueConverter="{StaticResource SecondsToTimeConverter}"
+                        ValueChanged="VolumeSlider_ValueChanged"
+                        Value="{x:Bind SliderPositionMs, Mode=TwoWay, Converter={StaticResource LongToDoubleConverter}}" />
+                    <TextBlock
+                        Grid.Column="2"
+                        Margin="0,4,16,4"
+                        VerticalAlignment="Center"
+                        Text="{x:Bind TrackDurationMs, Mode=OneWay, Converter={StaticResource SecondsToTimeConverter}}" />
 
 
-
-			<StackPanel
-				Grid.Column="2"
-				Padding="0,0,0,0"
-				HorizontalAlignment="Stretch"
-				VerticalAlignment="Center">
-				<StackPanel
-					Grid.Column="1"
-					Margin="0,0,0,0"
-					Padding="0"
-					HorizontalAlignment="Center"
-					VerticalAlignment="Stretch"
-					CornerRadius="8"
-					Orientation="Horizontal">
-
-					<Button
-						x:Name="repeatBTN"
-						Grid.Column="4"
-						Width="35"
-						Height="35"
-						Margin="0,0,8,0"
-						Padding="0"
-						Background="Transparent"
-						Tapped="repeatBTN_Tapped"
-						AutomationProperties.Name="Режим воспроизведения"
-						AutomationProperties.HelpText="Переключает режим: повтор одного трека, повтор всех треков, перемешать">
-						<FontIcon
-							x:Name="repeatBTNIcon"
-							FontSize="14"
-							Glyph="" />
-					</Button>
-
-
-					<Button
-						x:Name="PreviousBTN"
-						Grid.Column="0"
-						Width="35"
-						Height="35"
-						Margin="0,0,0,0"
-						Padding="0"
-						Background="Transparent"
-						FocusVisualPrimaryBrush="Transparent"
-						FocusVisualSecondaryThickness="0"
-						Tapped="PreviousBTN_Tapped"
-						AutomationProperties.Name="Предыдущий трек"
-						AutomationProperties.HelpText="Переходит к предыдущему треку">
-						<FontIcon FontSize="12" Glyph="" />
-					</Button>
-
-					<Button
-						x:Name="PlayButtonHost"
-						Width="40"
-						Height="40"
-						Margin="8,0,8,0"
-						Padding="0"
-						Background="Transparent"
-						Tapped="Button_Play_Tapped"
-						AutomationProperties.Name="Воспроизвести"
-						AutomationProperties.HelpText="Запускает или останавливает воспроизведение текущего трека">
-						<FontIcon
-							x:Name="PlayBTN"
-							FontSize="14"
-							Glyph="" />
-					</Button>
-
-					<Button
-						x:Name="NextBTN"
-						Width="35"
-						Height="35"
-						Margin="0,0,8,0"
-						Padding="0"
-						Background="Transparent"
-						Tapped="NextBTN_Tapped"
-						AutomationProperties.Name="Следующий трек"
-						AutomationProperties.HelpText="Переходит к следующему треку">
-						<FontIcon FontSize="12" Glyph="" />
-					</Button>
+                </Grid>
+            </Grid>
+        </Canvas>
+        <Grid
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Stretch"
+            Background="Transparent" />
+        <Rectangle
+            x:Name="RedRectangle"
+            Width="100"
+            Height="Auto"
+            HorizontalAlignment="Left"
+            Fill="{ThemeResource AccentAAFillColorDisabledBrush}" />
+        <!--  Основной контент  -->
+        <Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="75" />
+                <ColumnDefinition Width="150" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="250" />
+            </Grid.ColumnDefinitions>
 
 
 
+            <StackPanel
+                Grid.Column="2"
+                Padding="0,0,0,0"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Center">
+                <StackPanel
+                    Grid.Column="1"
+                    Margin="0,0,0,0"
+                    Padding="0"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Stretch"
+                    CornerRadius="8"
+                    Orientation="Horizontal">
 
-					<Button
-						x:Name="VolumeButton"
-						Grid.Column="4"
-						Width="35"
-						Height="35"
-						Padding="0"
-						Background="Transparent"
-						AutomationProperties.Name="Громкость"
-						AutomationProperties.HelpText="Открывает регулятор громкости">
-						<FontIcon FontSize="14" Glyph="&#xE995;" />
-						<Button.Flyout>
-							<Flyout>
-								<Grid Height="27" Margin="-15">
-									<Slider
-										x:Name="SoundSlider"
-										Grid.Column="2"
-										Width="150"
-										Margin="10,-1,10,0"
-										VerticalAlignment="Top"
-										Background="AliceBlue"
-										Minimum="0"
-										Orientation="Horizontal"
-										AutomationProperties.Name="Громкость"
-										AutomationProperties.HelpText="Регулирует громкость воспроизведения. Используйте стрелки влево и вправо."
-										PointerEntered="SoundSlider_PointerEntered"
-										PointerExited="SoundSlider_PointerExited"
-										StepFrequency="1"
-										ValueChanged="SoundSlider_ValueChanged"
-										Value="{x:Bind simpleAudioBind, Mode=TwoWay}" />
-								</Grid>
-							</Flyout>
-						</Button.Flyout>
-
-					</Button>
+                    <Button
+                        x:Name="repeatBTN"
+                        Grid.Column="4"
+                        Width="35"
+                        Height="35"
+                        Margin="0,0,8,0"
+                        Padding="0"
+                        AutomationProperties.HelpText="Переключает режим: повтор одного трека, повтор всех треков, перемешать"
+                        AutomationProperties.Name="Режим воспроизведения"
+                        Background="Transparent"
+                        Tapped="repeatBTN_Tapped">
+                        <FontIcon
+                            x:Name="repeatBTNIcon"
+                            FontSize="14"
+                            Glyph="" />
+                    </Button>
 
 
-				</StackPanel>
-			</StackPanel>
+                    <Button
+                        x:Name="PreviousBTN"
+                        Grid.Column="0"
+                        Width="35"
+                        Height="35"
+                        Margin="0,0,0,0"
+                        Padding="0"
+                        AutomationProperties.HelpText="Переходит к предыдущему треку"
+                        AutomationProperties.Name="Предыдущий трек"
+                        Background="Transparent"
+                        FocusVisualPrimaryBrush="Transparent"
+                        FocusVisualSecondaryThickness="0"
+                        Tapped="PreviousBTN_Tapped">
+                        <FontIcon FontSize="12" Glyph="" />
+                    </Button>
+
+                    <Button
+                        x:Name="PlayButtonHost"
+                        Width="40"
+                        Height="40"
+                        Margin="8,0,8,0"
+                        Padding="0"
+                        AutomationProperties.HelpText="Запускает или останавливает воспроизведение текущего трека"
+                        AutomationProperties.Name="Воспроизвести"
+                        Background="Transparent"
+                        Tapped="Button_Play_Tapped">
+                        <FontIcon
+                            x:Name="PlayBTN"
+                            FontSize="14"
+                            Glyph="" />
+                    </Button>
+
+                    <Button
+                        x:Name="NextBTN"
+                        Width="35"
+                        Height="35"
+                        Margin="0,0,8,0"
+                        Padding="0"
+                        AutomationProperties.HelpText="Переходит к следующему треку"
+                        AutomationProperties.Name="Следующий трек"
+                        Background="Transparent"
+                        Tapped="NextBTN_Tapped">
+                        <FontIcon FontSize="12" Glyph="" />
+                    </Button>
 
 
-			<Grid
-				Grid.Column="0"
-				Width="60"
-				Height="60"
-				Margin="6,6,6,6"
-				Background="{ThemeResource CardBackgroundFillColorDefault}"
-				CornerRadius="8"
-				Tapped="Grid_Tapped"
-				Translation="0,0,8"
-				AutomationProperties.Name="Обложка трека">
-				<FontIcon Glyph="&#xEC4F;" />
-				<Image x:Name="ImageThumb" />
-			</Grid>
-			<Grid
-				Grid.Column="1"
-				Width="150"
-				MaxHeight="75"
-				Margin="0,6,8,6"
-				Tapped="Grid_Tapped">
-				<Grid.RowDefinitions>
-					<RowDefinition Height="*" />
-					<RowDefinition Height="*" />
-				</Grid.RowDefinitions>
-				<StackPanel
-					x:Name="TitleClipGrid"
-					Grid.Row="0"
-					VerticalAlignment="Bottom"
-					Orientation="Horizontal"
-					SizeChanged="TitleClipGrid_SizeChanged"
-					AutomationProperties.Name="{x:Bind TrackDataThis.audio.Title, Mode=OneWay}"
-					AutomationProperties.IsRequiredForForm="True"
-					AutomationProperties.ItemType="Трек">
-					<TextBlock
-						x:Name="TitleTextBlock"
-						MinWidth="0"
-						VerticalAlignment="Center"
-						Loaded="TitleTextBlock_Loaded"
-						Opacity="1"
-						TextTrimming="None"
-						TextWrapping="NoWrap"
-						AutomationProperties.Name="{x:Bind TrackDataThis.audio.Title, Mode=OneWay}">
-						<TextBlock.RenderTransform>
-							<TranslateTransform x:Name="TitleTranslate" />
-						</TextBlock.RenderTransform>
-					</TextBlock>
-				</StackPanel>
-				<StackPanel
-					x:Name="ArtistClipGrid"
-					Grid.Row="1"
-					VerticalAlignment="Top"
-					Orientation="Horizontal"
-					SizeChanged="ArtistClipGrid_SizeChanged"
-					AutomationProperties.Name="{x:Bind TrackDataThis.audio.Artist, Mode=OneWay}"
-					AutomationProperties.IsRequiredForForm="True"
-					AutomationProperties.ItemType="Исполнитель">
-					<TextBlock
-						x:Name="ArtistTextBlock"
-						MinWidth="0"
-						Loaded="ArtistTextBlock_Loaded"
-						Opacity="0.6"
-						TextTrimming="None"
-						TextWrapping="NoWrap"
-						AutomationProperties.Name="{x:Bind TrackDataThis.audio.Artist, Mode=OneWay}">
-						<TextBlock.RenderTransform>
-							<TranslateTransform x:Name="ArtistTranslate" />
-						</TextBlock.RenderTransform>
-					</TextBlock>
-				</StackPanel>
-			</Grid>
-
-			<StackPanel Grid.Column="3" Orientation="Horizontal">
-				<Button
-					x:Name="openLirycBTN"
-					Grid.Column="0"
-					Width="30"
-					Height="30"
-					Margin="8,0,0,0"
-					Padding="0"
-					Background="Transparent"
-					Tapped="openLirycBTN_Tapped"
-					AutomationProperties.Name="Открыть текст песни">
-					<TextBlock>T</TextBlock>
-					<ToolTipService.ToolTip>
-						<ToolTip Content="Открыть текст песни" />
-					</ToolTipService.ToolTip>
-
-				</Button>
-
-				<Button
-					x:Name="OpenEqalizer"
-					Grid.Column="0"
-					Width="30"
-					Height="30"
-					Margin="8,0,0,0"
-					Padding="0"
-					Background="Transparent"
-					Tapped="OpenEqalizer_Tapped"
-					AutomationProperties.Name="Эквалайзер">
-					<FontIcon Glyph="&#xE9E9;" />
-					<ToolTipService.ToolTip>
-						<ToolTip Content="Эквалайзер" />
-					</ToolTipService.ToolTip>
-					<Button.Flyout>
-						<Flyout>
-							<Flyout.FlyoutPresenterStyle>
-								<Style TargetType="FlyoutPresenter">
-									<Setter Property="MaxWidth" Value="4000" />
-									<!--  Максимальная ширина  -->
-									<Setter Property="MaxHeight" Value="6000" />
-									<!--  Максимальная высота  -->
-									<Setter Property="CornerRadius" Value="8" />
-									<!--  Опционально: можно также задать Padding, чтобы контент не прилипал к краям  -->
-									<Setter Property="Padding" Value="0" />
-								</Style>
-							</Flyout.FlyoutPresenterStyle>
-							<controls:EqualizerControlPage />
-						</Flyout>
-					</Button.Flyout>
-				</Button>
-
-				<Button
-					Grid.Column="0"
-					Width="30"
-					Height="30"
-					Margin="8,0,8,0"
-					Padding="0"
-					Background="Transparent"
-					Tapped="goToPlayList_BTN"
-					AutomationProperties.Name="Посмотреть текущий список воспроизведения">
-					<SymbolIcon Symbol="List" />
-					<ToolTipService.ToolTip>
-						<ToolTip Content="Посмотреть текущий список воспроизведения" />
-					</ToolTipService.ToolTip>
-				</Button>
-
-				<Button
-					x:Name="TranslatetoStatus"
-					Width="30"
-					Height="30"
-					Margin="0,0,8,0"
-					Padding="-2,-2,0,0"
-					Background="Transparent"
-					Tapped="TranslatetoStatus_Tapped"
-					AutomationProperties.Name="Транслировать в статус ВК">
-					<FontIcon
-						x:Name="StatusBTNIcon"
-						FontSize="12"
-						Glyph="" />
-					<ToolTipService.ToolTip>
-						<ToolTip Content="Транслировать в статус ВК" />
-					</ToolTipService.ToolTip>
-				</Button>
-				<Button
-					x:Name="trackDoingBTN"
-					Grid.Column="4"
-					Width="30"
-					Height="30"
-					Margin="0,0,0,0"
-					Padding="0"
-					Background="Transparent"
-					Tapped="trackDoingBTN_Tapped"
-					AutomationProperties.Name="Действия с треком">
-					<FontIcon Glyph="&#xE712;" />
-				</Button>
-			</StackPanel>
 
 
-		</Grid>
+                    <Button
+                        x:Name="VolumeButton"
+                        Grid.Column="4"
+                        Width="35"
+                        Height="35"
+                        Padding="0"
+                        AutomationProperties.HelpText="Открывает регулятор громкости"
+                        AutomationProperties.Name="Громкость"
+                        Background="Transparent">
+                        <FontIcon FontSize="14" Glyph="&#xE995;" />
+                        <Button.Flyout>
+                            <Flyout>
+                                <Grid Height="27" Margin="-15">
+                                    <Slider
+                                        x:Name="SoundSlider"
+                                        Grid.Column="2"
+                                        Width="150"
+                                        Margin="10,-1,10,0"
+                                        VerticalAlignment="Top"
+                                        AutomationProperties.HelpText="Регулирует громкость воспроизведения. Используйте стрелки влево и вправо."
+                                        AutomationProperties.Name="Громкость"
+                                        Background="AliceBlue"
+                                        Minimum="0"
+                                        Orientation="Horizontal"
+                                        PointerEntered="SoundSlider_PointerEntered"
+                                        PointerExited="SoundSlider_PointerExited"
+                                        StepFrequency="1"
+                                        ValueChanged="SoundSlider_ValueChanged"
+                                        Value="{x:Bind simpleAudioBind, Mode=TwoWay}" />
+                                </Grid>
+                            </Flyout>
+                        </Button.Flyout>
 
-		<!--  Скрытая область для объявлений экранному диктору (Narrator)  -->
-		<TextBlock
-			x:Name="AccessibilityLiveRegion"
-			Width="1"
-			Height="1"
-			HorizontalAlignment="Left"
-			VerticalAlignment="Top"
-			IsHitTestVisible="False"
-			Opacity="0"
-			AutomationProperties.LiveSetting="Assertive" />
+                    </Button>
 
-	</Grid>
+
+                </StackPanel>
+            </StackPanel>
+
+
+            <Grid
+                Grid.Column="0"
+                Width="60"
+                Height="60"
+                Margin="6,6,6,6"
+                AutomationProperties.Name="Обложка трека"
+                Background="{ThemeResource CardBackgroundFillColorDefault}"
+                CornerRadius="8"
+                Tapped="Grid_Tapped"
+                Translation="0,0,8">
+                <FontIcon Glyph="&#xEC4F;" />
+                <Image x:Name="ImageThumb" />
+            </Grid>
+            <Grid
+                Grid.Column="1"
+                Width="150"
+                MaxHeight="75"
+                Margin="0,6,8,6"
+                Tapped="Grid_Tapped">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <StackPanel
+                    x:Name="TitleClipGrid"
+                    Grid.Row="0"
+                    VerticalAlignment="Bottom"
+                    AutomationProperties.IsRequiredForForm="True"
+                    AutomationProperties.ItemType="Трек"
+                    AutomationProperties.Name="{x:Bind TrackDataThis.audio.Title, Mode=OneWay}"
+                    Orientation="Horizontal"
+                    SizeChanged="TitleClipGrid_SizeChanged">
+                    <TextBlock
+                        x:Name="TitleTextBlock"
+                        MinWidth="0"
+                        VerticalAlignment="Center"
+                        AutomationProperties.Name="{x:Bind TrackDataThis.audio.Title, Mode=OneWay}"
+                        Loaded="TitleTextBlock_Loaded"
+                        Opacity="1"
+                        TextTrimming="None"
+                        TextWrapping="NoWrap">
+                        <TextBlock.RenderTransform>
+                            <TranslateTransform x:Name="TitleTranslate" />
+                        </TextBlock.RenderTransform>
+                    </TextBlock>
+                </StackPanel>
+                <StackPanel
+                    x:Name="ArtistClipGrid"
+                    Grid.Row="1"
+                    VerticalAlignment="Top"
+                    AutomationProperties.IsRequiredForForm="True"
+                    AutomationProperties.ItemType="Исполнитель"
+                    AutomationProperties.Name="{x:Bind TrackDataThis.audio.Artist, Mode=OneWay}"
+                    Orientation="Horizontal"
+                    SizeChanged="ArtistClipGrid_SizeChanged">
+                    <TextBlock
+                        x:Name="ArtistTextBlock"
+                        MinWidth="0"
+                        AutomationProperties.Name="{x:Bind TrackDataThis.audio.Artist, Mode=OneWay}"
+                        Loaded="ArtistTextBlock_Loaded"
+                        Opacity="0.6"
+                        TextTrimming="None"
+                        TextWrapping="NoWrap">
+                        <TextBlock.RenderTransform>
+                            <TranslateTransform x:Name="ArtistTranslate" />
+                        </TextBlock.RenderTransform>
+                    </TextBlock>
+                </StackPanel>
+            </Grid>
+
+            <StackPanel Grid.Column="3" Orientation="Horizontal">
+                <Button
+                    x:Name="openLirycBTN"
+                    Grid.Column="0"
+                    Width="30"
+                    Height="30"
+                    Margin="8,0,0,0"
+                    Padding="0"
+                    AutomationProperties.Name="Открыть текст песни"
+                    Background="Transparent"
+                    Tapped="openLirycBTN_Tapped">
+                    <TextBlock>T</TextBlock>
+                    <ToolTipService.ToolTip>
+                        <ToolTip Content="Открыть текст песни" />
+                    </ToolTipService.ToolTip>
+
+                </Button>
+
+                <Button
+                    x:Name="OpenEqalizer"
+                    Grid.Column="0"
+                    Width="30"
+                    Height="30"
+                    Margin="8,0,0,0"
+                    Padding="0"
+                    AutomationProperties.Name="Эквалайзер"
+                    Background="Transparent"
+                    Tapped="OpenEqalizer_Tapped">
+                    <FontIcon Glyph="&#xE9E9;" />
+                    <ToolTipService.ToolTip>
+                        <ToolTip Content="Эквалайзер" />
+                    </ToolTipService.ToolTip>
+                    <Button.Flyout>
+                        <Flyout>
+                            <Flyout.FlyoutPresenterStyle>
+                                <Style TargetType="FlyoutPresenter">
+                                    <Setter Property="MaxWidth" Value="4000" />
+                                    <!--  Максимальная ширина  -->
+                                    <Setter Property="MaxHeight" Value="6000" />
+                                    <!--  Максимальная высота  -->
+                                    <Setter Property="CornerRadius" Value="8" />
+                                    <!--  Опционально: можно также задать Padding, чтобы контент не прилипал к краям  -->
+                                    <Setter Property="Padding" Value="0" />
+                                </Style>
+                            </Flyout.FlyoutPresenterStyle>
+                            <controls:EqualizerControlPage />
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
+
+                <Button
+                    Grid.Column="0"
+                    Width="30"
+                    Height="30"
+                    Margin="8,0,8,0"
+                    Padding="0"
+                    AutomationProperties.Name="Посмотреть текущий список воспроизведения"
+                    Background="Transparent"
+                    Tapped="goToPlayList_BTN">
+                    <SymbolIcon Symbol="List" />
+                    <ToolTipService.ToolTip>
+                        <ToolTip Content="Посмотреть текущий список воспроизведения" />
+                    </ToolTipService.ToolTip>
+                </Button>
+
+                <Button
+                    x:Name="fullScreenBTN"
+                    Grid.Column="0"
+                    Width="30"
+                    Height="30"
+                    Margin="0,0,8,0"
+                    Padding="0"
+                    AutomationProperties.HelpText="Открывает плеер на весь экран с текстом песни"
+                    AutomationProperties.Name="Полноэкранный режим"
+                    Background="Transparent"
+                    Tapped="fullScreenBTN_Tapped">
+                    <FontIcon FontSize="14" Glyph="&#xE740;" />
+                    <ToolTipService.ToolTip>
+                        <ToolTip Content="Полноэкранный режим" />
+                    </ToolTipService.ToolTip>
+                </Button>
+
+                <Button
+                    x:Name="TranslatetoStatus"
+                    Width="30"
+                    Height="30"
+                    Margin="0,0,8,0"
+                    Padding="-2,-2,0,0"
+                    AutomationProperties.Name="Транслировать в статус ВК"
+                    Background="Transparent"
+                    Tapped="TranslatetoStatus_Tapped">
+                    <FontIcon
+                        x:Name="StatusBTNIcon"
+                        FontSize="12"
+                        Glyph="" />
+                    <ToolTipService.ToolTip>
+                        <ToolTip Content="Транслировать в статус ВК" />
+                    </ToolTipService.ToolTip>
+                </Button>
+                <Button
+                    x:Name="trackDoingBTN"
+                    Grid.Column="4"
+                    Width="30"
+                    Height="30"
+                    Margin="0,0,0,0"
+                    Padding="0"
+                    AutomationProperties.Name="Действия с треком"
+                    Background="Transparent"
+                    Tapped="trackDoingBTN_Tapped">
+                    <FontIcon Glyph="&#xE712;" />
+                </Button>
+            </StackPanel>
+
+
+        </Grid>
+
+        <!--  Скрытая область для объявлений экранному диктору (Narrator)  -->
+        <TextBlock
+            x:Name="AccessibilityLiveRegion"
+            Width="1"
+            Height="1"
+            HorizontalAlignment="Left"
+            VerticalAlignment="Top"
+            AutomationProperties.LiveSetting="Assertive"
+            IsHitTestVisible="False"
+            Opacity="0" />
+
+    </Grid>
 
 
 

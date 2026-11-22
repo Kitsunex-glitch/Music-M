@@ -20,12 +20,12 @@
     Title="Music M"
     mc:Ignorable="d">
     <Grid>
-  
-        <snow:SnowFlakeEffect Background="Red"
+
+        <snow:SnowFlakeEffect
             x:Name="snow"
             AutoStart="False"
             FlakeCount="100" />
-  
+
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -299,9 +299,7 @@
 
             <Grid Grid.Row="1">
                 <devCommunity:ConfettiCannon x:Name="ConfettiCanon" />
-                <login:ExtendFrame
-                    x:Name="ContentFrame"
-                    Navigated="ContentFrame_Navigated">
+                <login:ExtendFrame x:Name="ContentFrame" Navigated="ContentFrame_Navigated">
                     <Frame.ContentTransitions>
                         <TransitionCollection>
                             <NavigationThemeTransition />
@@ -310,7 +308,7 @@
                 </login:ExtendFrame>
 
             </Grid>
-            
+
         </Grid>
 
     </Grid>
