@@ -31,6 +31,38 @@
                             VerticalScrollBarVisibility="Hidden">
                             <Grid Background="Transparent" />
                         </ScrollViewer>
+
+                        <!--
+                            Подсказка «текст без синхронизации»: показывается, когда у песни
+                            нет таймингов. Пользователю понятно, почему строки не подсвечиваются
+                            и полотно не следует за плеером.
+                        -->
+                        <Border
+                            x:Name="PART_UntimedBadge"
+                            Margin="0,10,0,0"
+                            Padding="10,4"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Top"
+                            AutomationProperties.HelpText="У этой песни нет таймингов текста: строки не подсвечиваются и не прокручиваются автоматически"
+                            AutomationProperties.Name="Текст без синхронизации"
+                            Background="#33000000"
+                            BorderBrush="#33FFFFFF"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            IsHitTestVisible="False"
+                            Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon
+                                    FontSize="12"
+                                    Foreground="#CCFFFFFF"
+                                    Glyph="&#xE9D9;" />
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    FontSize="12"
+                                    Foreground="#CCFFFFFF"
+                                    Text="Текст без синхронизации" />
+                            </StackPanel>
+                        </Border>
                     </Grid>
                 </ControlTemplate>
             </Setter.Value>

@@ -83,6 +83,33 @@
 
                 <AppBarSeparator Height="24" VerticalAlignment="Center" />
 
+                <!--
+                    Индикатор «текст без синхронизации»: у песни нет таймингов,
+                    строки не подсвечиваются и не следуют за плеером.
+                -->
+                <Border
+                    x:Name="UntimedIndicator"
+                    Padding="10,4"
+                    VerticalAlignment="Center"
+                    Background="#22000000"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="12"
+                    ToolTipService.ToolTip="У этой песни нет таймингов текста: строки не подсвечиваются и не прокручиваются автоматически"
+                    Visibility="{x:Bind IsUntimed, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon
+                            FontSize="12"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Glyph="&#xE9D9;" />
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            FontSize="12"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="Без синхронизации" />
+                    </StackPanel>
+                </Border>
+
                 <StackPanel VerticalAlignment="Center" Spacing="2">
                     <TextBlock
                         FontSize="11"

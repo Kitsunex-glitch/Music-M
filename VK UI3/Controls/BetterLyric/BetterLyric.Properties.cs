@@ -311,6 +311,61 @@ public partial class BetterLyric
         ctl.timelineSyncThreshold = (int)e.NewValue;
     }
 
+    /// <summary>
+    /// Текущий текст не имеет таймингов (нет синхронизации с плеером).
+    /// <para>
+    /// Позволяет контролу игнорировать позицию воспроизведения (не привязывать
+    /// полотно к «случайной» строке) и показывать пользователю плашку-подсказку,
+    /// чтобы было понятно, почему текст не подсвечивается.
+    /// </para>
+    /// <para>
+    /// Само значение вычисляется по данным текста (<see cref="LyricData.IsUntimed"/>);
+    /// контрол дополнительно страхуется, если свойство не задано.
+    /// </para>
+    /// </summary>
+    public bool IsLyricsUntimed
+    {
+        get { return (bool)GetValue(IsLyricsUntimedProperty); }
+        set { SetValue(IsLyricsUntimedProperty, value); }
+    }
+
+    public static readonly DependencyProperty IsLyricsUntimedProperty =
+        DependencyProperty.Register(nameof(IsLyricsUntimed), typeof(bool), typeof(BetterLyric), new PropertyMetadata(false, OnIsLyricsUntimedChanged));
+
+    private static void OnIsLyricsUntimedChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        var ctl = (BetterLyric)d;
+        ctl.isLyricsUntimed = (bool)e.NewValue;
+
+        BetterLyricDebugLog.WriteAlways(
+            BetterLyricLogCategory.Data,
+            $"IsLyricsUntimed -> {ctl.isLyricsUntimed}");
+
+        // Статичный текст: привязка к позиции отключается, полотно возвращается
+        // к началу (без анимации), подсветка строки снимается.
+        if (ctl.isLyricsUntimed)
+        {
+            ctl._synchronizer.Reset();
+            ctl._primaryPlayingLineIndex = 0;
+            ctl._isPlayingLinePending = false;
+            ctl._pendingSnapLineIndex = -1;
+            ctl._snapConfirmedByPlayer = false;
+            ctl.isScrollLockedBySnap = false;
+            ctl._canvasTargetScrollOffset = 0;
+            ctl._canvasYScrollTransition.JumpTo(0);
+            ctl._mouseYScrollTransition.JumpTo(0);
+
+            // Плавное появление строк зависит от времени — для статичного текста
+            // оно не нужно (все строки должны быть видны сразу).
+            foreach (var line in ctl._renderLyricsLines ?? new List<RenderLyricsLine>())
+            {
+                line.IsPlayingLastFrame = false;
+            }
+        }
+
+        ctl.RequestAnimationRefresh();
+    }
+
     public bool IsAutoLayoutEnabled
     {
         get { return (bool)GetValue(IsAutoLayoutEnabledProperty); }

@@ -84,6 +84,35 @@ namespace VK_UI3.Views.ModalsPages
         }
         private string _credits;
 
+        /// <summary>
+        /// Текущий текст не имеет таймингов (нет синхронизации с плеером).
+        /// Управляет видимостью индикатора в тулбаре — чтобы пользователь понимал,
+        /// почему строки не подсвечиваются и не прокручиваются автоматически.
+        /// </summary>
+        public bool IsUntimed
+        {
+            get => _isUntimed;
+            set
+            {
+                if (_isUntimed == value)
+                    return;
+
+                _isUntimed = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsUntimed)));
+                UpdateUntimedIndicator();
+            }
+        }
+        private bool _isUntimed;
+
+        /// <summary>Показывает/скрывает индикатор «без синхронизации» в тулбаре.</summary>
+        private void UpdateUntimedIndicator()
+        {
+            if (UntimedIndicator == null)
+                return;
+
+            UntimedIndicator.Visibility = _isUntimed ? Visibility.Visible : Visibility.Collapsed;
+        }
+
         /// <summary>Текущий набор строк (используется для копирования в буфер обмена).</summary>
         public ObservableRangeCollection<object> Texts { get; } = new();
 
@@ -93,6 +122,7 @@ namespace VK_UI3.Views.ModalsPages
         public LyricsPage()
         {
             InitializeComponent();
+            UpdateUntimedIndicator();
             _geniusService = App._host.Services.GetRequiredService<GeniusService>();
             _httpClient = new HttpClient();
             Loaded += OnLoaded;
@@ -209,24 +239,26 @@ namespace VK_UI3.Views.ModalsPages
                 await LoadLyricsAsync();
             }
 
-            // Текст без таймингов: позиция плеера не подаётся в контрол,
-            // иначе полотно уедет к случайной строке.
-            if (IsUntimedMode)
+            var mediaPlayer = VK_UI3.Services.MediaPlayerService.MediaPlayer;
+            if (mediaPlayer == null)
             {
                 LyricsView.CurrentIsPlaying = false;
                 return;
             }
 
-            var mediaPlayer = VK_UI3.Services.MediaPlayerService.MediaPlayer;
-            if (mediaPlayer == null)
-                return;
-
-            var position = mediaPlayer.Position;
-            LyricsView.CurrentPosition = position;
-            LyricsView.CurrentIsPlaying = mediaPlayer.PlaybackSession?.PlaybackState
+            var isPlayerPlaying = mediaPlayer.PlaybackSession?.PlaybackState
                 == Windows.Media.Playback.MediaPlaybackState.Playing;
 
-            timerTickCangeCheck?.Invoke(this, new ArgsSeconds((int)position.TotalMilliseconds));
+            // Позиция плеера подаётся в контрол ВСЕГДА — и для текста без таймингов тоже.
+            // Раньше в untimed-режиме здесь стоял ранний выход (и CurrentIsPlaying = false),
+            // и контрол полностью переставал обновлять кадры. Если СЛЕДУЮЩАЯ песня
+            // приходила с таймингами, кадровый цикл уже не перезапускался — текст
+            // «замирал» и переставал следить за плеером. Контрол сам игнорирует
+            // синхронизацию при LyricData.IsUntimed (см. UpdateFrame/DrawCore).
+            LyricsView.CurrentPosition = mediaPlayer.Position;
+            LyricsView.CurrentIsPlaying = isPlayerPlaying;
+
+            timerTickCangeCheck?.Invoke(this, new ArgsSeconds((int)mediaPlayer.Position.TotalMilliseconds));
         }
 
         public void Enable()
@@ -562,7 +594,9 @@ namespace VK_UI3.Views.ModalsPages
                 IsPrimaryHasRealSyllableInfo = false
             };
 
-            ApplyLyricsData(new LyricData(new List<LyricLine> { line }));
+            // Заглушка не синхронизирована с плеером: без таймингов она должна
+            // вести себя как статичный текст (без подсветки и автопрокрутки).
+            ApplyLyricsData(LyricData.CreateUntimed(new List<LyricLine> { line }));
         }
 
         /// <summary>Установить данные в контрол (в UI-потоке).</summary>
@@ -578,21 +612,33 @@ namespace VK_UI3.Views.ModalsPages
                     $"untimed={data.IsUntimed}, duration={data.Duration.TotalSeconds:0.##} с, " +
                     $"UI-поток={DispatcherQueue.HasThreadAccess}");
 
+                // Признак «без синхронизации» нужен и самому контролу (он покажет плашку
+                // и не будет привязывать полотно к позиции), и странице (индикатор в тулбаре).
+                LyricsView.IsLyricsUntimed = data.IsUntimed;
+                IsUntimed = data.IsUntimed;
+                UpdateUntimedIndicator();
+
+                // Контрол продолжает получать кадры и позицию в любом режиме:
+                // это гарантирует, что при переходе на песню с таймингами
+                // слежение включится само, без «перезапуска» состояния.
+                LyricsView.CurrentIsPlaying = IsPlayerPlaying();
+
                 if (data.IsUntimed)
                 {
-                    // Текст без таймингов: позиция плеера не подаётся в контрол, иначе
-                    // синхронизатор подсветит случайную строку и полотно уедет к ней.
+                    // Текст без таймингов: синхронизацию с плеером отключает сам контрол
+                    // (по IsLyricsUntimed) — здесь только статичный профиль эффектов.
                     ApplyUntimedEffectProfile();
                     LyricsView.CurrentLyricsData = data;
-                    LyricsView.CurrentPosition = TimeSpan.Zero;
-                    LyricsView.CurrentIsPlaying = false;
                 }
                 else
                 {
                     RestoreTimedEffectProfile();
                     LyricsView.CurrentLyricsData = data;
-                    LyricsView.CurrentPosition = VK_UI3.Services.MediaPlayerService.MediaPlayer?.Position ?? TimeSpan.Zero;
                 }
+
+                // Позиция подаётся всегда — и для синхронизированного текста, и для статичного
+                // (контрол сам решает, использовать ли её для привязки строк).
+                LyricsView.CurrentPosition = VK_UI3.Services.MediaPlayerService.MediaPlayer?.Position ?? TimeSpan.Zero;
             }
 
             if (DispatcherQueue.HasThreadAccess)
@@ -613,6 +659,12 @@ namespace VK_UI3.Views.ModalsPages
             _isUntimedProfileApplied = true;
 
             var v = LyricsView;
+
+            // Снимок пользовательских значений «в момент входа» в статичный режим.
+            // Сброс настроек во время показа статичного текста обнуляет снимок настроек
+            // (_appliedSettingsSnapshot), из-за чего ApplySavedSettings(force: true)
+            // при возврате к таймингам мог не донести изменения до контрола.
+            _timedProfileSnapshot = CaptureTimedProfile(v);
             v.WordByWordEffectMode = LyricsWordByWordEffectMode.Never;
             v.IsLyricsGlowEffectEnabled = false;
             v.IsLyricsScaleEffectEnabled = false;
@@ -633,6 +685,11 @@ namespace VK_UI3.Views.ModalsPages
         /// <summary>
         /// Возврат к пользовательским настройкам оформления после статичного текста.
         /// Настройки в БД не трогаются — они применяются заново из сохранённых значений.
+        /// <para>
+        /// Дополнительно значения из снимка раскладываются напрямую: это гарантирует,
+        /// что после песни без таймингов эффекты (включая «слово за словом») точно
+        /// включатся обратно, даже если сохранённый снимок настроек не изменился.
+        /// </para>
         /// </summary>
         private void RestoreTimedEffectProfile()
         {
@@ -643,6 +700,12 @@ namespace VK_UI3.Views.ModalsPages
 
             ApplySavedSettings(force: true);
 
+            if (_timedProfileSnapshot.HasValue)
+            {
+                ApplyTimedProfile(LyricsView, _timedProfileSnapshot.Value);
+                _timedProfileSnapshot = null;
+            }
+
             BetterLyricDebugLog.WriteAlways(
                 BetterLyricLogCategory.Data,
                 "Untimed: восстановлен пользовательский профиль эффектов");
@@ -651,8 +714,61 @@ namespace VK_UI3.Views.ModalsPages
         /// <summary>Признак того, что к контролу применён статичный (untimed) профиль.</summary>
         private bool _isUntimedProfileApplied;
 
+        /// <summary>Пользовательские значения эффектов, снятые при входе в статичный режим.</summary>
+        private TimedEffectProfile? _timedProfileSnapshot;
+
+        /// <summary>Набор свойств контрола, которые переопределяет статичный профиль.</summary>
+        private readonly record struct TimedEffectProfile(
+            LyricsWordByWordEffectMode WordByWord,
+            bool Glow,
+            bool Scale,
+            bool Float,
+            bool Blur,
+            bool OutOfSight,
+            bool Breathing,
+            bool ThreeD,
+            bool Fan,
+            bool FadeOut);
+
+        private static TimedEffectProfile CaptureTimedProfile(BetterLyric v) => new(
+            v.WordByWordEffectMode,
+            v.IsLyricsGlowEffectEnabled,
+            v.IsLyricsScaleEffectEnabled,
+            v.IsLyricsFloatAnimationEnabled,
+            v.IsLyricsBlurEffectEnabled,
+            v.IsLyricsOutOfSightEffectEnabled,
+            v.IsLyricsBrethingEffectEnabled,
+            v.Is3DLyricsEnabled,
+            v.IsFanLyricsEnabled,
+            v.IsLyricsFadeOutEffectEnabled);
+
+        private static void ApplyTimedProfile(BetterLyric v, in TimedEffectProfile p)
+        {
+            v.WordByWordEffectMode = p.WordByWord;
+            v.IsLyricsGlowEffectEnabled = p.Glow;
+            v.IsLyricsScaleEffectEnabled = p.Scale;
+            v.IsLyricsFloatAnimationEnabled = p.Float;
+            v.IsLyricsBlurEffectEnabled = p.Blur;
+            v.IsLyricsOutOfSightEffectEnabled = p.OutOfSight;
+            v.IsLyricsBrethingEffectEnabled = p.Breathing;
+            v.Is3DLyricsEnabled = p.ThreeD;
+            v.IsFanLyricsEnabled = p.Fan;
+            v.IsLyricsFadeOutEffectEnabled = p.FadeOut;
+        }
+
         /// <summary>Текущий текст отображается без таймингов.</summary>
         private bool IsUntimedMode => _lyricsData?.IsUntimed == true;
+
+        /// <summary>
+        /// Обновляет все индикаторы «текст без синхронизации» по актуальным данным.
+        /// Вызывается при смене источника текста, сбросе и загрузке страницы.
+        /// </summary>
+        private void RefreshUntimedIndicators()
+        {
+            var isUntimed = IsUntimedMode;
+            LyricsView.IsLyricsUntimed = isUntimed;
+            IsUntimed = isUntimed;
+        }
 
         #endregion
 

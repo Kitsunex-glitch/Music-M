@@ -36,12 +36,16 @@ public partial class BetterLyric : Control
 {
     private const string PART_Canvas = "PART_Canvas";
     private const string PART_ScrollViewer = "PART_ScrollViewer";
+    private const string PART_UntimedBadge = "PART_UntimedBadge";
 
     // CanvasControl (не CanvasAnimatedControl): его composition-поверхность
     // поддерживает альфа-канал, поэтому канвас прозрачен и фон под ним виден.
     // Кадры двигает CompositionTarget.Rendering (см. BetterLyric.RenderLoop.cs).
     private CanvasControl canvas;
     private ScrollViewer _scrollViewer;
+
+    /// <summary>Плашка-подсказка «текст без синхронизации».</summary>
+    private FrameworkElement? _untimedBadge;
 
     public event EventHandler<int>? LineClicked;
 
@@ -162,6 +166,18 @@ public partial class BetterLyric : Control
     private int _lastDrawnLineCount = -1;
     private bool _isEmptyFrameReported = false;
 
+    /// <summary>
+    /// Текст без таймингов (см. <see cref="IsLyricsUntimed"/>): позиция плеера
+    /// не используется для привязки строк, подсветка не включается.
+    /// </summary>
+    private bool isLyricsUntimed = false;
+
+    /// <summary>
+    /// Текущий текст статичный: свойство задано явно либо данные сами помечены
+    /// как <see cref="LyricData.IsUntimed"/> (страховка, если страница забыла свойство).
+    /// </summary>
+    private bool IsUntimedNow => isLyricsUntimed || currentLyricsData?.IsUntimed == true;
+
     public TimeSpan SongPosition => _songPosition;
     public double CurrentCanvasYScroll => _canvasYScrollTransition.Value;
     public double ActualLyricsHeight => CalculateActualHeight(_renderLyricsLines);
@@ -191,6 +207,9 @@ public partial class BetterLyric : Control
         canvas.Draw += OnDraw;
 
         StartRenderLoop();
+
+        _untimedBadge = GetTemplateChild(PART_UntimedBadge) as FrameworkElement;
+        UpdateUntimedBadge();
 
         _scrollViewer = GetTemplateChild(PART_ScrollViewer) as ScrollViewer;
         if (_scrollViewer != null)
@@ -350,8 +369,18 @@ public partial class BetterLyric : Control
         // иначе пользовательский скролл перебьёт примагничивание.
         isScrollLockedBySnap = true;
 
-        // Примагничиваемся строго к зафиксированной строке.
-        SnapToLine(clickedLineIndex);
+        // Статичный текст: перематывать некуда, но подсветка/выбор строки кликом
+        // допустимы. Примагничивание к строке включаем только для синхронизированного
+        // текста — иначе полотно прыгало бы к «условной» строке.
+        if (!IsUntimedNow)
+        {
+            // Примагничиваемся строго к зафиксированной строке.
+            SnapToLine(clickedLineIndex);
+        }
+        else
+        {
+            isScrollLockedBySnap = false;
+        }
 
         LineClicked?.Invoke(this, clickedLineIndex);
 
@@ -518,6 +547,11 @@ public partial class BetterLyric : Control
                 $"песня: строка={_primaryPlayingLineIndex}, pos={_songPositionWithOffset.TotalMilliseconds:0} мс ({FormatTime(_songPositionWithOffset)}) | " +
                 $"в якоре будет строка={wheelPreviewLine} '{Truncate(previewText, 35)}'");
 
+            // Текст без таймингов: автоматически возвращать полотно некуда —
+            // пользователь листает его свободно, офсет остаётся на месте.
+            if (IsUntimedNow)
+                return;
+
            _ = _scrollWheelDebounceTimer.RunAsync(() =>
             {
                 BetterLyricDebugLog.WriteAlways(
@@ -560,6 +594,9 @@ public partial class BetterLyric : Control
         canvas.Draw += OnDraw;
 
         StartRenderLoop();
+
+        _untimedBadge = GetTemplateChild(PART_UntimedBadge) as FrameworkElement;
+        UpdateUntimedBadge();
 
         _scrollViewer = GetTemplateChild(PART_ScrollViewer) as ScrollViewer;
         if (_scrollViewer != null)
@@ -626,6 +663,8 @@ public partial class BetterLyric : Control
         SizeChanged -= OnSizeChanged;
         Unloaded -= OnUnloaded;
 
+        _untimedBadge = null;
+
         _lyricsRenderer.Dispose();
 
         // Сбрасываем всё, что привязано к уничтоженному CanvasControl,
@@ -676,6 +715,18 @@ public partial class BetterLyric : Control
 
         if (isLyricsVisible)
         {
+            // Статичный текст: ни одна строка не считается «играющей» —
+            // подсветка, масштаб и посимвольные эффекты не включаются.
+            if (IsUntimedNow)
+            {
+                _lyricsRenderer.PendingLineIndex = -1;
+                if (_renderLyricsLines != null)
+                {
+                    foreach (var line in _renderLyricsLines)
+                        line.IsPlayingLastFrame = false;
+                }
+            }
+
             int drawn = _lyricsRenderer.Draw(sender, ds);
 
             // Диагностика «пустого кадра»: текст видим, но на экран не попало ни строки.
@@ -739,6 +790,15 @@ public partial class BetterLyric : Control
         var lyricsData = currentLyricsData;
 
         BetterLyricDebugLog.NextFrame();
+
+        // Статичный текст: кадровый цикл продолжает работать (чтобы при переходе
+        // на песню с таймингами слежение включилось само), но позиция воспроизведения
+        // не учитывается — полотно стоит, подсветки нет.
+        if (IsUntimedNow)
+        {
+            UpdateUntimedFrame(elapsedTime);
+            return;
+        }
 
         _immersiveBgOpacityTransition.Update(elapsedTime);
         _immersiveBgColorTransition.Update(elapsedTime);
@@ -1004,6 +1064,114 @@ public partial class BetterLyric : Control
         }
     }
 
+    /// <summary>
+    /// Кадр для текста без таймингов: строки не привязаны к позиции плеера.
+    /// Полотно остаётся на месте (скролл — только пользовательский), раскладка
+    /// поддерживается актуальной, кадры продолжают запрашиваться — благодаря
+    /// этому при следующей песне с таймингами слежение включается сразу.
+    /// </summary>
+    private void UpdateUntimedFrame(TimeSpan elapsedTime)
+    {
+        _immersiveBgOpacityTransition.Update(elapsedTime);
+        _immersiveBgColorTransition.Update(elapsedTime);
+
+        TriggerRelayout();
+
+        if (_renderLyricsLines != null)
+        {
+            // Позиция плеера не используется: прогресс и подсветка сняты.
+            _primaryPlayingLineIndex = 0;
+            _isPlayingLinePending = false;
+
+            foreach (var line in _renderLyricsLines)
+            {
+                line.IsPlayingLastFrame = false;
+            }
+
+            UpdateLines(
+                _renderLyricsLines,
+                isMouseScrolling ? 0 : _visibleRange.Start,
+                isMouseScrolling ? _renderLyricsLines.Count - 1 : _visibleRange.End,
+                0,
+                renderLyricsWidth,
+                renderLyricsHeight,
+                0,
+                playingLineTopOffset / 100.0,
+                _canvasYScrollTransition,
+                elapsedTime,
+                isMouseScrolling,
+                _isLayoutChanged,
+                false,
+                isMouseScrollingChanged,
+                false,
+                // Прогресс заведомо до начала первой строки: символы не «проиграны».
+                double.NegativeInfinity,
+                false,
+                false);
+        }
+
+        _mouseYScrollTransition.Update(elapsedTime);
+
+        _mouseHoverLineIndex = FindMouseHoverLineIndex(
+            _renderLyricsLines,
+            isMouseInLyricsArea,
+            mousePosition,
+            _mouseYScrollTransition.Value,
+            renderLyricsHeight,
+            playingLineTopOffset / 100.0);
+
+        _visibleRange = CalculateVisibleRange(
+            _renderLyricsLines,
+            _mouseYScrollTransition.Value,
+            renderLyricsStartY,
+            renderLyricsHeight,
+            ActualHeight,
+            playingLineTopOffset / 100.0);
+
+        isMouseScrollingChanged = false;
+        isReturningFromScroll = false;
+        _isNowPlayingPaletteChanged = false;
+        _isLayoutChanged = false;
+
+        if (isLyricsVisible)
+        {
+            _lyricsRenderer.CalculateLyrics3DMatrix(false);
+            _lyricsRenderer.MouseHoverLineIndex = _mouseHoverLineIndex;
+            _lyricsRenderer.IsMousePressing = isMousePressing;
+            _lyricsRenderer.StartVisibleLineIndex = _visibleRange.Start;
+            _lyricsRenderer.EndVisibleLineIndex = _visibleRange.End;
+            _lyricsRenderer.UserScrollOffset = _mouseYScrollTransition.Value;
+            _lyricsRenderer.LyricsX = renderLyricsStartX;
+            _lyricsRenderer.LyricsY = renderLyricsStartY;
+            _lyricsRenderer.LyricsWidth = renderLyricsWidth;
+            _lyricsRenderer.LyricsHeight = renderLyricsHeight;
+            _lyricsRenderer.IsLyricsVisible = isLyricsVisible;
+            _lyricsRenderer.PlayingLineTopOffsetFactor = playingLineTopOffset / 100.0;
+            // Время за пределами текста — ни одна строка не подсвечена.
+            _lyricsRenderer.CurrentProgressMs = double.NegativeInfinity;
+            _lyricsRenderer.PendingLineIndex = -1;
+            _lyricsRenderer.RenderConfig = new LyricsRenderConfig(wordByWordEffectMode, lyricsLineContentOrientation, is3DLyricsEnabled, autoWrap, isLyricsBrethingEffectEnabled, isLyricsFloatAnimationEnabled, isLyricsGlowEffectEnabled, isLyricsScaleEffectEnabled, isRightToLeftLyric, isFanLyricsEnabled, fanLyricsAngle, lyricsFontStrokeWidth, playingLineTopOffset, lyrics3DXAngle, lyrics3DYAngle, lyrics3DZAngle, lyrics3DDepth, lyricsGlowColor);
+            _lyricsRenderer.RenderLyricsLines = _renderLyricsLines;
+            _lyricsRenderer.Update(canvas, 0, lyricsBreathingIntensity);
+        }
+
+        if (canvas != null && isLyricsVisible)
+        {
+            canvas.Invalidate();
+        }
+    }
+
+    /// <summary>
+    /// Показывает плашку-подсказку, когда у песни нет таймингов текста:
+    /// пользователь видит, почему строки не подсвечиваются.
+    /// </summary>
+    internal void UpdateUntimedBadge()
+    {
+        if (_untimedBadge == null) return;
+
+        _untimedBadge.Visibility = IsUntimedNow ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     private void UpdatePlaybackState(TimeSpan elapsedTime)
     {
         // Пока ждём подтверждения перемотки от плеера, локальные часы стоят:
@@ -1057,6 +1225,9 @@ public partial class BetterLyric : Control
                 $"Пересоздание строк: dirty={_isContentDirty}, dataReplaced={isDataReplaced}, " +
                 $"contentSigChanged={isContentSignatureChanged}, countMismatch={isLineCountMismatch}, linesMissing={isLinesMissing}, " +
                 $"newCount={lyricsData.LyricsLines.Count}");
+
+            // Данные сменились — подсказка «без синхронизации» должна соответствовать новому тексту.
+            UpdateUntimedBadge();
 
             DisposeRenderLyricsLines();
 
@@ -1464,6 +1635,7 @@ public partial class BetterLyric : Control
         builder.AppendLine($"IsLyricsVisible: {isLyricsVisible}");
         builder.AppendLine($"AutoLayout: {isAutoLayoutEnabled}, AutoWrap: {autoWrap}, RTL: {isRightToLeftLyric}");
         builder.AppendLine($"IsPlaying: {currentIsPlaying}, Position: {currentPosition.TotalMilliseconds:0} мс, Local: {_songPosition.TotalMilliseconds:0} мс, Offset: {positionOffset} мс");
+        builder.AppendLine($"Untimed: {IsUntimedNow} (property={isLyricsUntimed}, data={currentLyricsData?.IsUntimed}), Badge: {(_untimedBadge?.Visibility.ToString() ?? "null")}");
         builder.AppendLine($"SyncThreshold: {timelineSyncThreshold} мс");
         builder.AppendLine($"Data: {(currentLyricsData == null ? "null" : $"{currentLyricsData.LyricsLines.Count} строк, wordByWord={currentLyricsData.IsWordByWord}, duration={currentLyricsData.Duration.TotalSeconds:0.##} с")}");
         builder.AppendLine($"RenderLines: {(lines == null ? "null" : lines.Count.ToString())}, contentDirty={_isContentDirty}, layoutChanged={_isLayoutChanged}");
