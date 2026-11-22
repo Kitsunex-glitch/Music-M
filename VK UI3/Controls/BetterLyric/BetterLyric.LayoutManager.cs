@@ -44,7 +44,7 @@ public partial class BetterLyric
     /// <param name="lyricsWidth"></param>
     /// <param name="lyricsHeight"></param>
     internal void MeasureAndArrange(
-        ICanvasAnimatedControl resourceCreator,
+        ICanvasResourceCreator resourceCreator,
         IList<RenderLyricsLine>? lines,
         double canvasWidth,
         double canvasHeight,

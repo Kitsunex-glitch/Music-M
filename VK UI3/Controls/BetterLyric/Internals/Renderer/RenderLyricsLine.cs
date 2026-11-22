@@ -216,7 +216,7 @@ internal partial class RenderLyricsLine : BaseRenderLyrics
     }
 
     public void RecreateTextLayout(
-        ICanvasAnimatedControl control,
+        ICanvasResourceCreator control,
         bool createPhonetic, bool createTranslated,
         int phoneticTextFontSize, int originalTextFontSize, int translatedTextFontSize,
         LyricFontWeight fontWeight,

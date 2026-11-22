@@ -37,7 +37,10 @@ public partial class BetterLyric : Control
     private const string PART_Canvas = "PART_Canvas";
     private const string PART_ScrollViewer = "PART_ScrollViewer";
 
-    private CanvasAnimatedControl canvas;
+    // CanvasControl (не CanvasAnimatedControl): его composition-поверхность
+    // поддерживает альфа-канал, поэтому канвас прозрачен и фон под ним виден.
+    // Кадры двигает CompositionTarget.Rendering (см. BetterLyric.RenderLoop.cs).
+    private CanvasControl canvas;
     private ScrollViewer _scrollViewer;
 
     public event EventHandler<int>? LineClicked;
@@ -172,19 +175,22 @@ public partial class BetterLyric : Control
     {
         base.OnApplyTemplate();
 
-        canvas = GetTemplateChild(PART_Canvas) as CanvasAnimatedControl;
+        canvas = GetTemplateChild(PART_Canvas) as CanvasControl;
         if (canvas == null)
         {
             BetterLyricDebugLog.WriteAlways(BetterLyricLogCategory.Lifecycle, "OnApplyTemplate: PART_Canvas не найден!");
             return;
         }
 
+        // Канвас прозрачен: очистка полностью прозрачным цветом (альфа = 0).
+        canvas.ClearColor = Windows.UI.Color.FromArgb(0, 0, 0, 0);
+
         canvas.CreateResources -= OnCreateResources;
         canvas.CreateResources += OnCreateResources;
         canvas.Draw -= OnDraw;
         canvas.Draw += OnDraw;
-        canvas.Update -= OnUpdate;
-        canvas.Update += OnUpdate;
+
+        StartRenderLoop();
 
         _scrollViewer = GetTemplateChild(PART_ScrollViewer) as ScrollViewer;
         if (_scrollViewer != null)
@@ -218,8 +224,14 @@ public partial class BetterLyric : Control
         Unloaded -= OnUnloaded;
         Unloaded += OnUnloaded;
 
+        // Контрол может быть перенесён в другое окно (репарент в полноэкранный плеер).
+        // При этом приходит Unloaded (canvas освобождается), а затем повторный Loaded —
+        // OnApplyTemplate больше не вызывается, поэтому canvas нужно переподключить здесь.
+        Loaded -= OnLoaded;
+        Loaded += OnLoaded;
+
         // Повторное применение шаблона (перезагрузка стиля) требует новой раскладки:
-        // старые CanvasTextLayout привязаны к прежнему CanvasAnimatedControl.
+        // старые CanvasTextLayout привязаны к прежнему CanvasControl.
         // Настройки, применённые до появления Canvas, тоже попадают сюда — их запрос
         // откладывался (см. RequestRelayout) и сбрасывается только сейчас.
         _isContentDirty = true;
@@ -525,18 +537,77 @@ public partial class BetterLyric : Control
         }
     }
 
+    /// <summary>
+    /// Повторная инициализация после репарентa (перенос в другое окно): при Unloaded
+    /// canvas освобождается, а шаблон заново не применяется — переподключаем ресурсы здесь.
+    /// </summary>
+    private void OnLoaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (canvas != null)
+            return; // уже инициализирован (обычная первая загрузка — шаблон уже отработал)
+
+        BetterLyricDebugLog.WriteAlways(BetterLyricLogCategory.Lifecycle, "OnLoaded: повторная инициализация после репарентa");
+
+        canvas = GetTemplateChild(PART_Canvas) as CanvasControl;
+        if (canvas == null)
+            return;
+
+        canvas.ClearColor = Windows.UI.Color.FromArgb(0, 0, 0, 0);
+
+        canvas.CreateResources -= OnCreateResources;
+        canvas.CreateResources += OnCreateResources;
+        canvas.Draw -= OnDraw;
+        canvas.Draw += OnDraw;
+
+        StartRenderLoop();
+
+        _scrollViewer = GetTemplateChild(PART_ScrollViewer) as ScrollViewer;
+        if (_scrollViewer != null)
+        {
+            _scrollViewer.PointerEntered -= OnScrollViewerPointerEntered;
+            _scrollViewer.PointerEntered += OnScrollViewerPointerEntered;
+
+            _scrollViewer.PointerExited -= OnScrollViewerPointerExited;
+            _scrollViewer.PointerExited += OnScrollViewerPointerExited;
+
+            _scrollViewer.PointerMoved -= OnScrollViewerPointerMoved;
+            _scrollViewer.PointerMoved += OnScrollViewerPointerMoved;
+
+            _scrollViewer.PointerPressed -= OnScrollViewerPointerPressed;
+            _scrollViewer.PointerPressed += OnScrollViewerPointerPressed;
+
+            _scrollViewer.PointerReleased -= OnScrollViewerPointerReleased;
+            _scrollViewer.PointerReleased += OnScrollViewerPointerReleased;
+
+            _scrollViewer.PointerWheelChanged -= OnScrollViewerPointerWheelChanged;
+            _scrollViewer.PointerWheelChanged += OnScrollViewerPointerWheelChanged;
+        }
+
+        // Новый device/дерево — строки и раскладку нужно построить заново.
+        _isContentDirty = true;
+        _layoutSignature = null;
+        _isLayoutChanged = false;
+        ConsumePendingRelayoutBeforeTemplate();
+        RequestRelayout();
+
+        // Раскладку строим на следующем тике: при репарентe размеры ещё нулевые
+        // в момент Loaded, а к следующему тику контрол уже измерен.
+        DispatcherQueue.TryEnqueue(TriggerRelayout);
+    }
+
     private void OnUnloaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
         BetterLyricDebugLog.WriteAlways(BetterLyricLogCategory.Lifecycle, "OnUnloaded: отписка и освобождение ресурсов");
+
+        StopRenderLoop();
+        _isCanvasDeviceReady = false;
 
         // Null-safe: OnUnloaded может прийти повторно или после неудачного OnApplyTemplate.
         if (canvas != null)
         {
             canvas.Draw -= OnDraw;
-            canvas.Update -= OnUpdate;
             canvas.CreateResources -= OnCreateResources;
 
-            canvas.Paused = true;
             canvas.RemoveFromVisualTree();
             canvas = null;
         }
@@ -557,7 +628,7 @@ public partial class BetterLyric : Control
 
         _lyricsRenderer.Dispose();
 
-        // Сбрасываем всё, что привязано к уничтоженному CanvasAnimatedControl,
+        // Сбрасываем всё, что привязано к уничтоженному CanvasControl,
         // иначе после повторной загрузки строки будут ссылаться на мёртвый device.
         DisposeRenderLyricsLines();
         _renderLyricsData = null;
@@ -579,17 +650,28 @@ public partial class BetterLyric : Control
         _layoutDebouncer.Dispose();
     }
 
-    private void OnDraw(ICanvasAnimatedControl sender, CanvasAnimatedDrawEventArgs args)
+    private void OnDraw(CanvasControl sender, CanvasDrawEventArgs args)
     {
         var ds = args.DrawingSession;
 
+        // Страховка: Draw гарантированно идёт после создания device.
+        _isCanvasDeviceReady = true;
+
+        // CanvasControl поддерживает альфа-канал: очищаем прозрачным цветом,
+        // и сквозь канвас виден фон контрола/окна (обложка, акрил, что угодно).
+        // CanvasBackgroundColor остаётся опциональным: если он непрозрачный —
+        // заливаем им (например, для непрозрачной панели), иначе — прозрачно.
+        // Читаем кэш поля, а не DP (безопасно при любом потоке отрисовки).
+        var bg = canvasBackgroundColorCache;
+        ds.Clear(bg.A > 0 ? bg : Windows.UI.Color.FromArgb(0, 0, 0, 0));
+
         DrawCoreWithEdgeFeatheringHandled(sender, ds);
     }
-    private void DrawCoreWithEdgeFeatheringHandled(ICanvasAnimatedControl sender, CanvasDrawingSession ds)
+    private void DrawCoreWithEdgeFeatheringHandled(ICanvasResourceCreator sender, CanvasDrawingSession ds)
     {
         DrawCore(sender, ds);
     }
-    private void DrawCore(ICanvasAnimatedControl sender, CanvasDrawingSession ds)
+    private void DrawCore(ICanvasResourceCreator sender, CanvasDrawingSession ds)
     {
 
         if (isLyricsVisible)
@@ -608,7 +690,7 @@ public partial class BetterLyric : Control
                         $"range={_visibleRange.Start}..{_visibleRange.End}, " +
                         $"yScroll={_canvasYScrollTransition.Value:0.##}, userScroll={_mouseYScrollTransition.Value:0.##}, " +
                         $"layout={renderLyricsWidth:0.#}x{renderLyricsHeight:0.#}@{renderLyricsStartX:0.#},{renderLyricsStartY:0.#}, " +
-                        $"canvas={sender.Size.Width:0.#}x{sender.Size.Height:0.#}");
+                        $"canvas={ActualWidth:0.#}x{ActualHeight:0.#}");
                 }
                 else if (drawn > 0)
                 {
@@ -626,11 +708,18 @@ public partial class BetterLyric : Control
         }
     }
 
-    private void OnCreateResources(CanvasAnimatedControl sender, Microsoft.Graphics.Canvas.UI.CanvasCreateResourcesEventArgs args)
+    private void OnCreateResources(CanvasControl sender, Microsoft.Graphics.Canvas.UI.CanvasCreateResourcesEventArgs args)
     {
         BetterLyricDebugLog.WriteAlways(
             BetterLyricLogCategory.Lifecycle,
             $"OnCreateResources: reason={args.Reason}, device={sender.Device?.ToString() ?? "null"}");
+
+        // CanvasDevice создан — с этого момента кадры можно обновлять (см. RenderLoop).
+        _isCanvasDeviceReady = true;
+
+        // Пересоздание device может сбросить ClearColor — задаём прозрачную очистку заново,
+        // чтобы канвас не заливал фон чёрным (критично в прозрачном окне плеера).
+        sender.ClearColor = Windows.UI.Color.FromArgb(0, 0, 0, 0);
 
         // Новый device — все CanvasTextLayout/кэши невалидны, строки нужно построить заново.
         _isContentDirty = true;
@@ -641,13 +730,15 @@ public partial class BetterLyric : Control
         TriggerRelayout();
     }
 
-    private void OnUpdate(ICanvasAnimatedControl sender, CanvasAnimatedUpdateEventArgs args)
+    /// <summary>
+    /// Логика кадра: раньше вызывалась из <c>CanvasAnimatedControl.Update</c>,
+    /// теперь — из цикла CompositionTarget.Rendering (см. BetterLyric.RenderLoop.cs).
+    /// </summary>
+    private void UpdateFrame(TimeSpan elapsedTime)
     {
         var lyricsData = currentLyricsData;
 
         BetterLyricDebugLog.NextFrame();
-
-        TimeSpan elapsedTime = args.Timing.ElapsedTime;
 
         _immersiveBgOpacityTransition.Update(elapsedTime);
         _immersiveBgColorTransition.Update(elapsedTime);
@@ -837,7 +928,7 @@ public partial class BetterLyric : Control
             _canvasYScrollTransition.Value + _mouseYScrollTransition.Value,
             renderLyricsStartY,
             renderLyricsHeight,
-            sender.Size.Height,
+            ActualHeight,
             playingLineTopOffset / 100.0
         );
 
@@ -901,9 +992,15 @@ public partial class BetterLyric : Control
             _lyricsRenderer.PlayingLineTopOffsetFactor = playingLineTopOffset / 100.0;
             _lyricsRenderer.CurrentProgressMs = _songPositionWithOffset.TotalMilliseconds;
             _lyricsRenderer.PendingLineIndex = _isPlayingLinePending ? _primaryPlayingLineIndex : -1;
-            _lyricsRenderer.RenderConfig = new LyricsRenderConfig(wordByWordEffectMode, lyricsLineContentOrientation, is3DLyricsEnabled, autoWrap, isLyricsBrethingEffectEnabled, isLyricsFloatAnimationEnabled, isLyricsGlowEffectEnabled, isLyricsScaleEffectEnabled, isRightToLeftLyric, isFanLyricsEnabled, fanLyricsAngle, lyricsFontStrokeWidth, playingLineTopOffset, lyrics3DXAngle, lyrics3DYAngle, lyrics3DZAngle, lyrics3DDepth);
+            _lyricsRenderer.RenderConfig = new LyricsRenderConfig(wordByWordEffectMode, lyricsLineContentOrientation, is3DLyricsEnabled, autoWrap, isLyricsBrethingEffectEnabled, isLyricsFloatAnimationEnabled, isLyricsGlowEffectEnabled, isLyricsScaleEffectEnabled, isRightToLeftLyric, isFanLyricsEnabled, fanLyricsAngle, lyricsFontStrokeWidth, playingLineTopOffset, lyrics3DXAngle, lyrics3DYAngle, lyrics3DZAngle, lyrics3DDepth, lyricsGlowColor);
             _lyricsRenderer.RenderLyricsLines = _renderLyricsLines;
-            _lyricsRenderer.Update(sender, 0, lyricsBreathingIntensity);
+            _lyricsRenderer.Update(canvas, 0, lyricsBreathingIntensity);
+        }
+
+        // Запрашиваем кадр отрисовки: CanvasControl рисует только по Invalidate().
+        if (canvas != null && isLyricsVisible)
+        {
+            canvas.Invalidate();
         }
     }
 
@@ -939,7 +1036,7 @@ public partial class BetterLyric : Control
 
         var lyricsData = currentLyricsData;
         var contentSignature = (lyricsFontStrokeWidth, isPhoneticEnabled, isTranslationEnabled);
-        var layoutSignature = LayoutSignature.From(this, canvas.Size.Width, canvas.Size.Height);
+        var layoutSignature = LayoutSignature.From(this, ActualWidth, ActualHeight);
 
         // 1. Текст песни или содержимое строк изменилось — строки нужно построить заново.
         bool isDataReplaced = !ReferenceEquals(_renderLyricsData, lyricsData);
@@ -997,8 +1094,8 @@ public partial class BetterLyric : Control
         MeasureAndArrange(
             resourceCreator: canvas,
             lines: _renderLyricsLines,
-            canvasWidth: canvas.Size.Width,
-            canvasHeight: canvas.Size.Height,
+            canvasWidth: ActualWidth,
+            canvasHeight: ActualHeight,
             lyricsWidth: renderLyricsWidth,
             lyricsHeight: renderLyricsHeight
         );
@@ -1035,7 +1132,7 @@ public partial class BetterLyric : Control
             return;
         }
 
-        var layoutSignature = LayoutSignature.From(this, canvas.Size.Width, canvas.Size.Height);
+        var layoutSignature = LayoutSignature.From(this, ActualWidth, ActualHeight);
 
         // ВАЖНО: досрочный выход допустим только когда данные и содержимое строк
         // точно актуальны. Иначе смена CurrentLyricsData на объект с тем же числом строк
@@ -1361,7 +1458,7 @@ public partial class BetterLyric : Control
         var builder = new System.Text.StringBuilder();
         builder.AppendLine("=== BetterLyric DumpState ===");
         builder.AppendLine($"Frame: {BetterLyricDebugLog.Frame}");
-        builder.AppendLine($"Canvas: {(canvas == null ? "null" : $"{canvas.Size.Width:0.#}x{canvas.Size.Height:0.#}, paused={canvas.Paused}")}");
+        builder.AppendLine($"Canvas: {(canvas == null ? "null" : $"{canvas.Size.Width:0.#}x{canvas.Size.Height:0.#}")}");
         builder.AppendLine($"ActualSize: {ActualWidth:0.#}x{ActualHeight:0.#}");
         builder.AppendLine($"LyricsRect: {renderLyricsWidth:0.#}x{renderLyricsHeight:0.#} @ {renderLyricsStartX:0.#},{renderLyricsStartY:0.#}");
         builder.AppendLine($"IsLyricsVisible: {isLyricsVisible}");

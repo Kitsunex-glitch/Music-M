@@ -69,7 +69,7 @@ internal partial class LyricsRenderer : BreathingRendererBase, IDisposable
     /// Рисует текст и возвращает количество фактически отрисованных строк
     /// (для диагностики «пустых кадров»).
     /// </summary>
-    public int Draw(ICanvasAnimatedControl control, CanvasDrawingSession ds)
+    public int Draw(ICanvasResourceCreator control, CanvasDrawingSession ds)
     {
         if (IsLyricsVisible == false)
         {
@@ -108,7 +108,7 @@ internal partial class LyricsRenderer : BreathingRendererBase, IDisposable
         return DrawLyricsWithEdgeFadeHandled(control, ds);
     }
 
-    private int DrawLyricsWithEdgeFadeHandled(ICanvasAnimatedControl control, CanvasDrawingSession ds)
+    private int DrawLyricsWithEdgeFadeHandled(ICanvasResourceCreator control, CanvasDrawingSession ds)
     {
         if (RenderConfig == null) return 0;
         if (_edgeFadeMaskRenderer.Brush != null && !RenderConfig.AutoWrap)
@@ -122,7 +122,7 @@ internal partial class LyricsRenderer : BreathingRendererBase, IDisposable
         return DrawLyrics(control, ds);
     }
 
-    private int DrawLyrics(ICanvasAnimatedControl control, CanvasDrawingSession ds)
+    private int DrawLyrics(ICanvasResourceCreator control, CanvasDrawingSession ds)
     {
         if (RenderLyricsLines == null)
         {
@@ -173,6 +173,7 @@ internal partial class LyricsRenderer : BreathingRendererBase, IDisposable
                 AutoWrap = RenderConfig.AutoWrap,
                 IsLyricsFloatAnimationEnabled = RenderConfig.IsLyricsFloatAnimationEnabled,
                 IsLyricsGlowEffectEnabled = RenderConfig.IsLyricsGlowEffectEnabled,
+                LyricsGlowColor = RenderConfig.LyricsGlowColor,
                 IsLyricsScaleEffectEnabled = RenderConfig.IsLyricsScaleEffectEnabled,
                 WordByWordEffectMode = RenderConfig.WordByWordEffectMode,
                 IsRightToLeft = RenderConfig.IsRightToLeftLyric
@@ -267,7 +268,7 @@ internal partial class LyricsRenderer : BreathingRendererBase, IDisposable
             Matrix4x4.CreateTranslation(center);
     }
 
-    public void Update(ICanvasAnimatedControl sender, float bassEnergy, int breathingIntensity)
+    public void Update(ICanvasResourceCreator sender, float bassEnergy, int breathingIntensity)
     {
         base.UpdateBreathing(bassEnergy, breathingIntensity);
         switch (RenderConfig?.LyricsLineContentOrientation)

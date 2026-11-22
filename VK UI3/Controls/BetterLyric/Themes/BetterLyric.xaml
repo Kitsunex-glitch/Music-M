@@ -1,8 +1,9 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
-<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:local="using:VK_UI3.Controls.BetterLyric"
-                    xmlns:win2d="using:Microsoft.Graphics.Canvas.UI.Xaml">
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:VK_UI3.Controls.BetterLyric"
+    xmlns:win2d="using:Microsoft.Graphics.Canvas.UI.Xaml">
 
     <Style BasedOn="{StaticResource DefaultBetterLyricStyle}" TargetType="local:BetterLyric" />
 
@@ -10,10 +11,25 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="local:BetterLyric">
-                    <Grid>
-                        <win2d:CanvasAnimatedControl x:Name="PART_Canvas" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
-                        <ScrollViewer x:Name="PART_ScrollViewer" VerticalScrollBarVisibility="Hidden">
-                            <Grid />
+                    <Grid Background="Transparent">
+                        <!--
+                            CanvasControl (НЕ CanvasAnimatedControl): его composition-поверхность
+                            поддерживает альфа-канал, поэтому канвас действительно прозрачен и
+                            фон контрола/окна под ним виден. Очистка задаётся ClearColor
+                            (по умолчанию Transparent). Кадры двигает CompositionTarget.Rendering
+                            (см. BetterLyric.RenderLoop.cs) с Invalidate().
+                        -->
+                        <win2d:CanvasControl
+                            x:Name="PART_Canvas"
+                            ClearColor="Transparent"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Stretch" />
+                        <!--  ScrollViewer лежит поверх канваса и не должен его перекрывать  -->
+                        <ScrollViewer
+                            x:Name="PART_ScrollViewer"
+                            Background="Transparent"
+                            VerticalScrollBarVisibility="Hidden">
+                            <Grid Background="Transparent" />
                         </ScrollViewer>
                     </Grid>
                 </ControlTemplate>

@@ -45,6 +45,9 @@ internal partial class LyricsLineRenderer
     public LyricsWordByWordEffectMode WordByWordEffectMode { get; set; }
     public bool IsLyricsFloatAnimationEnabled { get; set; }
     public bool IsLyricsGlowEffectEnabled { get; set; }
+
+    /// <summary>Цвет свечения. Если Alpha = 0 — берётся цвет текущего символа.</summary>
+    public Color LyricsGlowColor { get; set; } = Colors.White;
     public bool IsLyricsScaleEffectEnabled { get; set; }
     public bool IsRightToLeft { get; set; }
     public void Draw(ICanvasResourceCreator resourceCreator, CanvasDrawingSession ds)
@@ -335,7 +338,13 @@ internal partial class LyricsLineRenderer
             renderChar.Crop.SourceRectangle = sourcePlayedCharRect;
             renderChar.Glow.BlurAmount = (float)glow;
 
-            ds.DrawImage(renderChar.Glow, destCharRect.Extend(destCharRect.Height), sourceCharRect.Extend(sourceCharRect.Height));
+            // Цвет свечения: заданный пользователем; если он полностью прозрачный —
+            // свечение остаётся того же цвета, что и текст (прежнее поведение).
+            if (LyricsGlowColor.A > 0)
+                renderChar.GlowTint.Color = LyricsGlowColor;
+
+            var glowSource = LyricsGlowColor.A > 0 ? renderChar.GlowTint : (ICanvasImage)renderChar.Glow;
+            ds.DrawImage(glowSource, destCharRect.Extend(destCharRect.Height), sourceCharRect.Extend(sourceCharRect.Height));
         }
 
         // Draw the top layer

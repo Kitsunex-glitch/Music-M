@@ -40,7 +40,7 @@ public partial class BetterLyric
     internal int playedOriginalLyricsOpacity = 100;
     internal int unplayedOriginalLyricsOpacity = 30;
     internal int translatedLyricsOpacity = 60;
-    internal LyricsTextAlignmentType lyricsAlignmentType = LyricsTextAlignmentType.Left;
+    internal LyricsTextAlignmentType lyricsAlignmentType = LyricsTextAlignmentType.Center;
     internal LyricsContentOrientation lyricsLineContentOrientation = LyricsContentOrientation.Vertical;
     internal bool autoWrap = true;
     internal int lyricsFontStrokeWidth = 0;
@@ -49,6 +49,9 @@ public partial class BetterLyric
     internal Color unplayedCurrentLineFillColor = Colors.White;
     internal Color playedTextStrokeColor = Colors.White;
     internal Color unplayedTextStrokeColor = Colors.White;
+    internal Color lyricsTextColor = Colors.White;
+    internal Color lyricsStrokeColor = Colors.White;
+    internal Color lyricsGlowColor = Colors.White;
     internal LyricFontWeight lyricsFontWeight = LyricFontWeight.Bold;
     internal double lyricsLineOverallSpacingFactor = 0.5;
     internal double lyricsLineInnerSpacingFactor = 0.1;
@@ -266,6 +269,33 @@ public partial class BetterLyric
     }
 
 
+    /// <summary>
+    /// Необязательный цвет заливки ПОД текстом внутри канваса.
+    /// По умолчанию полностью прозрачный (Alpha = 0) — тогда канвас прозрачен
+    /// и виден фон контрола/окна. Задайте непрозрачный цвет, если тексту нужна
+    /// собственная подложка (например, отдельная панель).
+    /// </summary>
+    public Color CanvasBackgroundColor
+    {
+        get { return (Color)GetValue(CanvasBackgroundColorProperty); }
+        set { SetValue(CanvasBackgroundColorProperty, value); }
+    }
+
+    public static readonly DependencyProperty CanvasBackgroundColorProperty =
+        DependencyProperty.Register(nameof(CanvasBackgroundColor), typeof(Color), typeof(BetterLyric),
+            new PropertyMetadata(Color.FromArgb(0, 0, 0, 0), OnCanvasBackgroundColorChanged));
+
+    // Кэш для чтения из OnDraw (отрисовка может идти вне UI-потока —
+    // GetValue там бросил бы COMException 0x8001010E RPC_E_WRONG_THREAD).
+    internal Color canvasBackgroundColorCache = Color.FromArgb(0, 0, 0, 0);
+
+    private static void OnCanvasBackgroundColorChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        var ctl = (BetterLyric)d;
+        ctl.canvasBackgroundColorCache = (Color)e.NewValue;
+        ctl.canvas?.Invalidate();
+    }
+
     public Color NonCurrentLineFillColor
     {
         get { return (Color)GetValue(NonCurrentLineFillColorProperty); }
@@ -349,7 +379,84 @@ public partial class BetterLyric
         ctl.unplayedTextStrokeColor = (Color)e.NewValue;
         ctl.NotifyNowPlayingPaletteChanged();
     }
-   
+
+    /// <summary>
+    /// Основной цвет текста песни. Применяется ко всем трём состояниям строки
+    /// (прошедшая / играющая / ещё не игранная), если их индивидуальные
+    /// свойства (<see cref="NonCurrentLineFillColor"/>, <see cref="PlayedCurrentLineFillColor"/>,
+    /// <see cref="UnplayedCurrentLineFillColor"/>) не заданы явно.
+    /// </summary>
+    public Color LyricsTextColor
+    {
+        get { return (Color)GetValue(LyricsTextColorProperty); }
+        set { SetValue(LyricsTextColorProperty, value); }
+    }
+
+    public static readonly DependencyProperty LyricsTextColorProperty =
+        DependencyProperty.Register(nameof(LyricsTextColor), typeof(Color), typeof(BetterLyric),
+            new PropertyMetadata(Colors.White, OnLyricsTextColorChanged));
+
+    private static void OnLyricsTextColorChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        var ctl = (BetterLyric)d;
+        var color = (Color)e.NewValue;
+        ctl.lyricsTextColor = color;
+
+        // Задаём все три состояния: цвет текста должен применяться целиком,
+        // независимо от того, какое состояние сейчас на экране.
+        ctl.nonCurrentLineFillColor = color;
+        ctl.playedCurrentLineFillColor = color;
+        ctl.unplayedCurrentLineFillColor = color;
+
+        ctl.NotifyNowPlayingPaletteChanged();
+    }
+
+    /// <summary>
+    /// Цвет обводки текста песни. Применяется ко всем трём состояниям строки.
+    /// </summary>
+    public Color LyricsStrokeColor
+    {
+        get { return (Color)GetValue(LyricsStrokeColorProperty); }
+        set { SetValue(LyricsStrokeColorProperty, value); }
+    }
+
+    public static readonly DependencyProperty LyricsStrokeColorProperty =
+        DependencyProperty.Register(nameof(LyricsStrokeColor), typeof(Color), typeof(BetterLyric),
+            new PropertyMetadata(Colors.White, OnLyricsStrokeColorChanged));
+
+    private static void OnLyricsStrokeColorChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        var ctl = (BetterLyric)d;
+        var color = (Color)e.NewValue;
+        ctl.lyricsStrokeColor = color;
+
+        ctl.playedTextStrokeColor = color;
+        ctl.unplayedTextStrokeColor = color;
+
+        ctl.NotifyNowPlayingPaletteChanged();
+    }
+
+    /// <summary>
+    /// Цвет свечения играющих символов. Пустой (Alpha = 0) — свечение красится
+    /// в текущий цвет текста.
+    /// </summary>
+    public Color LyricsGlowColor
+    {
+        get { return (Color)GetValue(LyricsGlowColorProperty); }
+        set { SetValue(LyricsGlowColorProperty, value); }
+    }
+
+    public static readonly DependencyProperty LyricsGlowColorProperty =
+        DependencyProperty.Register(nameof(LyricsGlowColor), typeof(Color), typeof(BetterLyric),
+            new PropertyMetadata(Colors.White, OnLyricsGlowColorChanged));
+
+    private static void OnLyricsGlowColorChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        var ctl = (BetterLyric)d;
+        ctl.lyricsGlowColor = (Color)e.NewValue;
+        ctl.canvas?.Invalidate();
+    }
+
     public LyricFontWeight LyricsFontWeight
     {
         get { return (LyricFontWeight)GetValue(LyricsFontWeightProperty); }

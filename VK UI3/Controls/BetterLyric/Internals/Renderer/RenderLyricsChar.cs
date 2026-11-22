@@ -41,6 +41,9 @@ internal partial class RenderLyricsChar : BaseRenderLyrics
     public CropEffect Crop { get; }
     public GaussianBlurEffect Glow { get; }
 
+    /// <summary>Окрашивает размытие свечения в заданный пользователем цвет.</summary>
+    public TintEffect GlowTint { get; }
+
     public double ProgressPlayed { get; set; } = 0; // 0~1
 
     public RenderLyricsChar(BaseLyric lyricsChars, Rect layoutRect) : base(lyricsChars)
@@ -63,6 +66,7 @@ internal partial class RenderLyricsChar : BaseRenderLyrics
         LayoutRect = layoutRect;
         Crop = new CropEffect { BorderMode = EffectBorderMode.Hard };
         Glow = new GaussianBlurEffect { Source = Crop, BorderMode = EffectBorderMode.Soft };
+        GlowTint = new TintEffect { Source = Glow, Color = Colors.White };
     }
 
     public void Update(TimeSpan elapsedTime)
@@ -76,6 +80,7 @@ internal partial class RenderLyricsChar : BaseRenderLyrics
     {
         Crop?.Dispose();
         Glow?.Dispose();
+        GlowTint?.Dispose();
     }
 
 }

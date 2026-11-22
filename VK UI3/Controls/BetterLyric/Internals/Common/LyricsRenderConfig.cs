@@ -45,5 +45,6 @@ internal record class LyricsRenderConfig(
     float Lyrics3DXAngle,
     float Lyrics3DYAngle,
     float Lyrics3DZAngle,
-    float Lyrics3DDepth
+    float Lyrics3DDepth,
+    Color LyricsGlowColor
 );
