@@ -8,15 +8,46 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     Margin="0"
     Padding="0"
+    HorizontalAlignment="Stretch"
+    HorizontalContentAlignment="Stretch"
+    VerticalAlignment="Stretch"
+    VerticalContentAlignment="Stretch"
     AutomationProperties.HelpText="Страница ожидания загрузки содержимого"
     AutomationProperties.Name="Страница ожидания"
     mc:Ignorable="d">
 
-    <Frame
-        x:Name="frameSection"
-        Margin="0"
-        Padding="0"
-        AutomationProperties.HelpText="Область отображения загружаемого содержимого"
-        AutomationProperties.Name="Фрейм содержимого"
-        Opacity="1" />
+    <Grid>
+        <Frame
+            x:Name="frameSection"
+            Margin="0"
+            Padding="0"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Stretch"
+            HorizontalContentAlignment="Stretch"
+            VerticalContentAlignment="Stretch"
+            AutomationProperties.HelpText="Область отображения загружаемого содержимого"
+            AutomationProperties.Name="Фрейм содержимого"
+            Opacity="1" />
+
+        <!--  Индикатор загрузки — оверлей на всю область, поэтому всегда строго по центру  -->
+        <Grid
+            x:Name="LoadingOverlay"
+            Background="Transparent"
+            AutomationProperties.Name="Индикатор выполнения операции"
+            AutomationProperties.HelpText="Показывает, что выполняется загрузка содержимого">
+            <Grid
+                Padding="25"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Background="{ThemeResource LayerOnAccentAcrylicFillColorDefaultBrush}"
+                CornerRadius="8">
+                <ProgressRing
+                    Width="75"
+                    Height="75"
+                    IsActive="True"
+                    AutomationProperties.Name="Индикатор прогресса"
+                    AutomationProperties.HelpText="Отображает выполнение фоновой операции" />
+            </Grid>
+        </Grid>
+    </Grid>
 </Page>

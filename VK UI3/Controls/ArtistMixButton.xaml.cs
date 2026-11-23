@@ -30,23 +30,40 @@ namespace VK_UI3.Controls
 
         private void ArtistMixButton_Loaded(object sender, RoutedEventArgs e)
         {
-            // Инициализация анимаций
+            // Unloaded наступает и при переключении вкладок — подписываемся в Loaded,
+            // иначе после возврата на вкладку картинки перестанут обновляться.
+            this.DataContextChanged -= ArtistMixButton_DataContextChanged;
+            this.DataContextChanged += ArtistMixButton_DataContextChanged;
+
+            // Инициализация анимаций (пересоздаём после выгрузки — они привязаны к элементам).
             _titleAnim = new AnimationsChangeText(TitleText, this.DispatcherQueue);
             _descriptionAnim = new AnimationsChangeText(DescriptionText, this.DispatcherQueue);
             _animationsChangeFontIcon = new AnimationsChangeFontIcon(PlayPause, this.DispatcherQueue);
+
+            // DataContext не менялся при возврате на вкладку — синхронизируем вручную.
+            SyncButtonFromDataContext();
             UpdateDisplay();
         }
 
         private void ArtistMixButton_Unloaded(object sender, RoutedEventArgs e)
         {
-            this.Loaded -= ArtistMixButton_Loaded;
-            this.Unloaded -= ArtistMixButton_Unloaded;
+            // Только отписка от DataContext: остальное восстановит Loaded.
             this.DataContextChanged -= ArtistMixButton_DataContextChanged;
         }
 
         private void ArtistMixButton_DataContextChanged(FrameworkElement sender, DataContextChangedEventArgs args)
         {
+            SyncButtonFromDataContext();
             UpdateDisplay();
+        }
+
+        /// <summary>
+        /// Берёт модель кнопки из DataContext. Если DataContext не того типа — сбрасываем,
+        /// чтобы не показывать данные предыдущего (переиспользованного) контейнера.
+        /// </summary>
+        private void SyncButtonFromDataContext()
+        {
+            _button = DataContext as MusicX.Core.Models.Button;
         }
 
         public MusicX.Core.Models.Button Button
@@ -61,12 +78,18 @@ namespace VK_UI3.Controls
 
         private void UpdateDisplay()
         {
-
+            if (TitleText == null)
+                return;
 
             // Загрузка изображений
             LoadImages();
 
-            if (_button == null) return;
+            if (_button == null)
+            {
+                TitleText.Text = string.Empty;
+                DescriptionText.Text = string.Empty;
+                return;
+            }
 
             // Обновление текстов
             TitleText.Text = _button.Title ?? string.Empty;
@@ -75,10 +98,15 @@ namespace VK_UI3.Controls
 
         private void LoadImages()
         {
+            if (fadeOp == null || GridThumbs == null || GridThumbsForeground == null)
+                return;
+
             if (_button?.Images == null || _button.Images.Count == 0)
             {
                 // Скрыть GridThumbs, показать placeholder
                 fadeOp.Opacity = 0;
+                GridThumbs.Children.Clear();
+                GridThumbsForeground.Children.Clear();
                 return;
             }
 
@@ -94,9 +122,15 @@ namespace VK_UI3.Controls
             {
                 GridThumbs.AddImagesToGrid(item.Url);
             }
-            foreach (var item in _button.ForegroundImages)
+
+            // ForegroundImages может отсутствовать у некоторых кнопок — иначе NRE.
+            if (_button.ForegroundImages != null)
             {
-                GridThumbsForeground.AddImagesToGrid(item.Url);
+                foreach (var item in _button.ForegroundImages)
+                {
+                    if (!string.IsNullOrEmpty(item?.Url))
+                        GridThumbsForeground.AddImagesToGrid(item.Url);
+                }
             }
         }
 

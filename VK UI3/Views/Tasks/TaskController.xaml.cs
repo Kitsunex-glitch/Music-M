@@ -65,6 +65,8 @@ namespace VK_UI3.Views.Tasks
                 _task.StatusChanged -= (OnDoingStatusUpdate);
             }
             _task = (DataContext as TaskAction);
+            if (_task == null)
+                return;
             DownloadTitle.Text = _task.nameTask;
             AutomationProperties.SetName(DownloadTitle, _task.nameTask);
 

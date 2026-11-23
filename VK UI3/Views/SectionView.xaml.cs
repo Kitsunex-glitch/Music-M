@@ -44,9 +44,10 @@ namespace VK_UI3.Views
 
         private void SectionView_Unloaded(object sender, RoutedEventArgs e)
         {
-
-            this.Loaded -= SectionView_Loaded;
-            this.Unloaded -= SectionView_Unloaded;
+            // Unloaded наступает и при переключении вкладки, поэтому собственные
+            // обработчики не снимаем: страница вернётся и должна работать как раньше.
+            // Только отписываемся от скролла, чтобы не дёргать догрузку в фоне;
+            // подписку восстановит SectionView_Loaded.
             this.scrollVIew.ViewChanged -= scrollVIew_ViewChanged;
         }
 
@@ -71,9 +72,24 @@ namespace VK_UI3.Views
         }
 
 
+        // Блоки уже загружались — при возврате на вкладку повторно не грузим.
+        private bool _contentInitialized;
+
         private void SectionView_Loaded(object sender, RoutedEventArgs e)
         {
+            // Возврат на вкладку: восстанавливаем подписку на скролл (XAML-подписка
+            // снимается в Unloaded и сама не вернётся).
+            this.scrollVIew.ViewChanged -= scrollVIew_ViewChanged;
+            this.scrollVIew.ViewChanged += scrollVIew_ViewChanged;
+
             scrollViewer =SmallHelpers.FindScrollViewer(scrollVIew);
+
+            // Повторный Loaded (переключение вкладок) — контент уже есть, не перезагружаем.
+            if (_contentInitialized)
+                return;
+
+            _contentInitialized = true;
+
             _ = Task.Run(async () =>
             {
                 if (this.section != null && this.section.Blocks != null && this.section.Blocks.Count != 0)

@@ -9,27 +9,27 @@
     mc:Ignorable="d"
     AutomationProperties.Name="Страница ожидания"
     AutomationProperties.HelpText="Отображается во время выполнения операций в фоновом режиме">
-    <Grid
-        Margin="50"
-        HorizontalAlignment="Center"
-        VerticalAlignment="Center"
-        Background="{ThemeResource LayerOnAccentAcrylicFillColorDefaultBrush}"
-        CornerRadius="8"
-        AutomationProperties.Name="Индикатор выполнения операции"
-        AutomationProperties.HelpText="Показывает, что выполняется какая-то операция в фоновом режиме">
-        <Grid.Resources>
-            <ThemeShadow x:Name="SharedShadow" />
-        </Grid.Resources>
+    <!--  Корневой Grid растянут на всю область, иначе Center считается относительно контента и спиннер уезжает вверх  -->
+    <Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+        <Grid
+            Padding="25"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Background="{ThemeResource LayerOnAccentAcrylicFillColorDefaultBrush}"
+            CornerRadius="8"
+            AutomationProperties.Name="Индикатор выполнения операции"
+            AutomationProperties.HelpText="Показывает, что выполняется какая-то операция в фоновом режиме">
+            <Grid.Resources>
+                <ThemeShadow x:Name="SharedShadow" />
+            </Grid.Resources>
 
-        <ProgressRing
-            Width="75"
-            Height="75"
-            Margin="25"
-            IsActive="True"
-            AutomationProperties.Name="Индикатор прогресса"
-            AutomationProperties.HelpText="Отображает выполнение фоновой операции" />
-
-
+            <ProgressRing
+                Width="75"
+                Height="75"
+                IsActive="True"
+                AutomationProperties.Name="Индикатор прогресса"
+                AutomationProperties.HelpText="Отображает выполнение фоновой операции" />
+        </Grid>
     </Grid>
 
 </Page>

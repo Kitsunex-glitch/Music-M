@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Navigation;
 using MusicX.Core.Exceptions.Boom;
 using MusicX.Core.Models;
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using VK_UI3.DB;
 using VK_UI3.Views.LoginWindow;
@@ -70,14 +71,34 @@ namespace VK_UI3.Views
 
         private void MainWindow_onRefreshClicked(object sender, EventArgs e)
         {
-            if (MainView.mainView == null ||
-            MainView.mainView.ContentFramePublic?.frameCurrent?.Frame?.Content != this)
+            // Стек навигации теперь принадлежит вкладке: проверяем фрейм именно этой страницы,
+            // а не активной вкладки (страница может жить в неактивной вкладке).
+            var ownerFrame = this.Frame;
+            if (MainView.mainView == null || ownerFrame == null || ownerFrame.Content != this)
             {
                 return;
             }
 
-            frameSection.Navigate(typeof(waitPage), null, GetNavigationTransitionInfo());
+            // Находим вкладку, которой принадлежит эта страница, и её стек навигации.
+            var ownerTab = MainView.TabManager?.Tabs
+                .FirstOrDefault(t => t.ContentFrame?.frameCurrent?.Frame == ownerFrame);
+
+            if (ownerTab == null || !ReferenceEquals(ownerTab, MainView.ActiveTab))
+            {
+                return;
+            }
+
+            ShowLoadingOverlay(true);
             LoadAsync();
+        }
+
+        /// <summary>Показывает/скрывает оверлей-индикатор загрузки на всю область вкладки.</summary>
+        private void ShowLoadingOverlay(bool visible)
+        {
+            if (LoadingOverlay == null)
+                return;
+
+            LoadingOverlay.Visibility = visible ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
         }
 
 
@@ -87,7 +108,7 @@ namespace VK_UI3.Views
         {
 
             frameSection.Navigated += FrameSection_Navigated;
-            frameSection.Navigate(typeof(waitPage), null, GetNavigationTransitionInfo());
+            ShowLoadingOverlay(true);
 
             var waitView = e.Parameter as WaitParameters;
             if (waitView == null)
@@ -232,7 +253,8 @@ namespace VK_UI3.Views
             }
             finally
             {
-
+                // Контент загружен (или показана ошибка) — убираем индикатор.
+                ShowLoadingOverlay(false);
             }
         }
 

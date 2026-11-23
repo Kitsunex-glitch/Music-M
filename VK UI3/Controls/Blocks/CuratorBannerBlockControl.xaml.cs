@@ -33,10 +33,11 @@ namespace VK_UI3.Controls.Blocks
             animationsChangeText = new Helpers.Animations.AnimationsChangeText(this.BTNText, this.DispatcherQueue);
             animationsChangeFont = new Helpers.Animations.AnimationsChangeFontIcon(this.BTNIcon, this.DispatcherQueue);            
         }
-        public Block Block => (Block)DataContext;
+        public Block Block => DataContext as Block;
         private void CuratorBannerBlockControl_DataContextChanged(FrameworkElement sender, DataContextChangedEventArgs args)
         {
-            if (DataContext is not MusicX.Core.Models.Block)
+            // Контрол мог остаться без DataContext (переиспользование/выгрузка контейнера).
+            if (DataContext is not MusicX.Core.Models.Block || Block?.Curators == null || Block.Curators.Count == 0)
                 return;
 
 

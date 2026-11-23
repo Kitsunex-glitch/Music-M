@@ -32,7 +32,7 @@ namespace VK_UI3.Controls.Blocks
         public event EventHandler showedClick;
 
 
-        public void invokeShowedClick(ExpBanner expBanner) 
+        public void invokeShowedClick(ExpBanner expBanner)
         {
             if (expBanner == this)
             {
@@ -40,7 +40,8 @@ namespace VK_UI3.Controls.Blocks
             }
             else selected = false;
 
-            showedClick.Invoke(expBanner, EventArgs.Empty);
+            // Подписчиков может не быть (контрол выгружен) — не падаем.
+            showedClick?.Invoke(expBanner, EventArgs.Empty);
         }
     }
 
@@ -54,9 +55,7 @@ namespace VK_UI3.Controls.Blocks
         public BigBannerControl()
         {
             this.InitializeComponent();
-            timer.Elapsed += OnTimedEvent;
             timer.AutoReset = true;
-            this.DataContextChanged += BigBannerControl_DataContextChanged;
             this.changeImage = new Helpers.Animations.AnimationsChangeImage(BannerImage, DispatcherQueue);
             titleText = new Helpers.Animations.AnimationsChangeText(Title, DispatcherQueue);
             SubTitleText = new Helpers.Animations.AnimationsChangeText(SubTitle, DispatcherQueue);
@@ -69,19 +68,24 @@ namespace VK_UI3.Controls.Blocks
 
         private void BigBannerControl_Unloaded(object sender, RoutedEventArgs e)
         {
-            foreach (var item in banners)
-            {
-                item.showedClick -= Banner_showedClick;
-            }
-            this.Loaded -= BigBannerControl_Loaded;
-            this.Unloaded -= BigBannerControl_Unloaded;
-            this.DataContextChanged -= BigBannerControl_DataContextChanged;
-            timer.Elapsed -= OnTimedEvent;
+            // Unloaded наступает и при переключении вкладки — только останавливаем таймер,
+            // подписки оставляем, чтобы после возврата контрол продолжал работать.
+            timer.Stop();
         }
 
         private void BigBannerControl_Loaded(object sender, RoutedEventArgs e)
         {
-            timer.Start();
+            // Подписки живут между Loaded/Unloaded (вкладки): не дублируем их.
+            timer.Elapsed -= OnTimedEvent;
+            timer.Elapsed += OnTimedEvent;
+            this.DataContextChanged -= BigBannerControl_DataContextChanged;
+            this.DataContextChanged += BigBannerControl_DataContextChanged;
+
+            // При повторном Loaded DataContext не менялся — синхронизируем вручную.
+            ApplyDataContext();
+
+            if (banners.Count > 1)
+                timer.Start();
         }
 
         private void OnTimedEvent(object sender, ElapsedEventArgs e)
@@ -95,31 +99,50 @@ namespace VK_UI3.Controls.Blocks
 
         public List<ExpBanner> banners = new List<ExpBanner>();
         Helpers.Animations.AnimationsChangeImage changeImage;
+
         private void BigBannerControl_DataContextChanged(FrameworkElement sender, DataContextChangedEventArgs args)
         {
-            if (DataContext is Block block)
-            {
-                if (block.Banners.Count() < 2)
-                {
+            ApplyDataContext();
+        }
 
-                    timer.Stop();
-                    myControl.Visibility = Visibility.Collapsed;
-                }
-                else
-                {
-                    foreach (var item in block.Banners)
-                    {
-                        ExpBanner banner = new ExpBanner(item);
-                        if (banners.Count == 0)
-                        {
-                            banner.selected = true;
-                        }
-                        banner.showedClick += Banner_showedClick;
-                        banners.Add(banner);
-                    }
-                }
+        /// <summary>
+        /// Пересобирает список баннеров из текущего DataContext. Вызывается как из
+        /// DataContextChanged, так и из Loaded (при возврате на вкладку DataContext не меняется).
+        /// </summary>
+        private void ApplyDataContext()
+        {
+            if (DataContext is not Block block)
+                return;
+
+            if (block.Banners == null || block.Banners.Count() == 0)
+                return;
+
+            if (block.Banners.Count() < 2)
+            {
+                timer.Stop();
+                myControl.Visibility = Visibility.Collapsed;
             }
-            else return;
+            else
+            {
+                // Полная пересборка: старые подписки снимаем, иначе после возврата
+                // на вкладку список дублировался бы.
+                DetachBanners();
+
+                foreach (var item in block.Banners)
+                {
+                    ExpBanner banner = new ExpBanner(item);
+                    if (banners.Count == 0)
+                    {
+                        banner.selected = true;
+                    }
+                    banner.showedClick += Banner_showedClick;
+                    banners.Add(banner);
+                }
+
+                myControl.Visibility = Visibility.Visible;
+            }
+
+            lastIndex = Math.Min(lastIndex, Math.Max(banners.Count - 1, 0));
 
             this.Title.Text = block.Banners[0].Title;
             this.SubTitle.Text = block.Banners[0].Text;
@@ -135,7 +158,15 @@ namespace VK_UI3.Controls.Blocks
             {
                 ActionCuratorButton.Visibility = Visibility.Visible;
             }
+        }
 
+        private void DetachBanners()
+        {
+            foreach (var item in banners)
+            {
+                item.showedClick -= Banner_showedClick;
+            }
+            banners.Clear();
         }
         Helpers.Animations.AnimationsChangeText titleText;
         Helpers.Animations.AnimationsChangeText SubTitleText;

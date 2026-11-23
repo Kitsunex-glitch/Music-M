@@ -52,6 +52,16 @@ namespace MusicX.Core.Helpers
         private static void SetPlaylistOwner(Playlist playlist, ResponseData response)
         {
             var ownerId = playlist.Original?.OwnerId ?? playlist.OwnerId;
+            SetPlaylistOwner(playlist, response, ownerId);
+        }
+
+        /// <summary>
+        /// Проставляет владельца плейлиста по явно переданному ownerId.
+        /// </summary>
+        private static void SetPlaylistOwner(Playlist playlist, ResponseData response, long ownerId)
+        {
+            if (playlist == null) return;
+
             if (ownerId < 0)
             {
                 // Группа
@@ -400,6 +410,14 @@ namespace MusicX.Core.Helpers
                     var playlist = response.Playlists?.SingleOrDefault(b => b.OwnerId + "_" + b.Id == lid);
                     recommended.Playlist = playlist;
                     block.RecommendedPlaylists.Add(recommended);
+
+                    // У recommended_playlists владелец не проставляется в SetPlaylistsOwners,
+                    // поэтому ищем его по OwnerId плейлиста (или самого рекоменда) — иначе аватар
+                    // в RecomUsersControl останется пустым.
+                    if (playlist != null && playlist.userOwner == null && playlist.groupOwner == null)
+                    {
+                        SetPlaylistOwner(playlist, response, playlist.OwnerId != 0 ? playlist.OwnerId : recommended.OwnerId);
+                    }
 
                     // Заполняем аудио внутри рекомендованного плейлиста
                     foreach (var aid in recommended.AudiosIds)

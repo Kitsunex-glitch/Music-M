@@ -47,6 +47,8 @@ namespace VK_UI3.Views.Upload
 
             }
             playListDownload = (DataContext as UploadTrack);
+            if (playListDownload == null)
+                return;
             DownloadTitle.Text = playListDownload.name;
 
             if (DownloadTitle.Text.Length > 20)

@@ -55,6 +55,8 @@ namespace VK_UI3.Views.Download
                 playListDownload.onStatusUpdate -= (OnTrackDownloaded_Event);
             }
             playListDownload = (DataContext as PlayListDownload);
+            if (playListDownload?.iVKGetAudio == null)
+                return;
             DownloadTitle.Text = playListDownload.iVKGetAudio.name;
 
             if (DownloadTitle.Text.Length > 20)

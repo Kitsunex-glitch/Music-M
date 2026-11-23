@@ -353,6 +353,9 @@ namespace VK_UI3
         #region Window Management
         private void MainWindow_CloseRequested(object sender, WindowEventArgs args)
         {
+            // Сохраняем открытые вкладки перед закрытием/скрытием, чтобы восстановить при запуске.
+            VK_UI3.Views.MainView.mainView?.SaveTabsForExit();
+
             // Если включено скрытие в трей, сразу прячем окно и не проверяем активные загрузки.
             var hideTray = DB.SettingsTable.GetSetting("hideTray");
             if (hideTray == null)

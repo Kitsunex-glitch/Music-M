@@ -59588,6 +59588,72 @@
             Информация о заявке на смену имени.
             </summary>
         </member>
+        <member name="P:VkNet.Model.User.Activity">
+            <summary>
+            Статус активности пользователя (строка в профиле).
+            </summary>
+        </member>
+        <member name="P:VkNet.Model.User.University">
+            <summary>
+            Идентификатор основного учебного заведения (устаревшее поле профиля).
+            </summary>
+        </member>
+        <member name="P:VkNet.Model.User.UniversityName">
+            <summary>
+            Название основного учебного заведения.
+            </summary>
+        </member>
+        <member name="P:VkNet.Model.User.Faculty">
+            <summary>
+            Идентификатор факультета.
+            </summary>
+        </member>
+        <member name="P:VkNet.Model.User.FacultyName">
+            <summary>
+            Название факультета.
+            </summary>
+        </member>
+        <member name="P:VkNet.Model.User.Graduation">
+            <summary>
+            Год окончания обучения.
+            </summary>
+        </member>
+        <member name="P:VkNet.Model.User.IsNft">
+            <summary>
+            У пользователя установлен NFT-аватар.
+            </summary>
+        </member>
+        <member name="P:VkNet.Model.User.IsEsiaVerified">
+            <summary>
+            Профиль подтверждён через ЕСИА (Госуслуги).
+            </summary>
+        </member>
+        <member name="P:VkNet.Model.User.IsTinkoffVerified">
+            <summary>
+            Профиль подтверждён через Тинькофф.
+            </summary>
+        </member>
+        <member name="P:VkNet.Model.User.IsSberVerified">
+            <summary>
+            Профиль подтверждён через Сбер.
+            </summary>
+        </member>
+        <member name="P:VkNet.Model.User.OAuthVerification">
+            <summary>
+            Данные OAuth-верификации профиля (список способов подтверждения).
+            </summary>
+        </member>
+        <member name="P:VkNet.Model.User.PhotoBase">
+            <summary>
+            URL базовой фотографии профиля (обычно наибольшее квадратное изображение).
+            </summary>
+        </member>
+        <member name="P:VkNet.Model.User.Photo">
+            <summary>
+            Первое доступное фото профиля: берёт любое из полей фотографий,
+            начиная с наиболее подходящего (базовое → 100 → 200 → 50 → максимальное).
+            </summary>
+        </member>
         <member name="P:VkNet.Model.User.Role">
             <summary>
             Полномочия руководителя (для Groups.GetMembers)
@@ -60518,6 +60584,25 @@
             Адрес который необходимо открыть в браузере для подтверждения валидации.
             </summary>
         </member>
+        <member name="P:VkNet.Model.VkError.Remixstlid">
+            <summary>
+            Временный идентификатор для server-to-server капчи VK ID.
+            <para>
+            VK требует передавать <c>success_token</c> вместе с <c>remixstlid</c>:
+            значение параметра и cookie должны совпадать. Если VK присылает это поле
+            в ошибке капчи, его нужно сохранить и вернуть в повторном запросе.
+            </para>
+            </summary>
+        </member>
+        <member name="P:VkNet.Model.VkError.AdditionalData">
+            <summary>
+            Все прочие поля ошибки, которые не описаны явно.
+            <para>
+            Нужны, чтобы не терять новые параметры, которые VK добавляет
+            в ответ с ошибкой капчи (например, дополнительные токены сессии).
+            </para>
+            </summary>
+        </member>
         <member name="T:VkNet.Model.VkObject">
             <summary>
             Определяет тип объекта
@@ -60916,6 +61001,15 @@
         <member name="P:VkNet.Exception.CaptchaNeededException.Img">
             <summary>
             Uri-адрес изображения с капчей
+            </summary>
+        </member>
+        <member name="P:VkNet.Exception.CaptchaNeededException.Remixstlid">
+            <summary>
+            Временный идентификатор для server-to-server капчи VK ID.
+            <para>
+            Если VK его прислал, <c>success_token</c> нужно отправлять вместе с ним:
+            значение параметра и cookie должны совпадать, иначе VK отклонит токен.
+            </para>
             </summary>
         </member>
         <member name="T:VkNet.Exception.ChatWasDisabledException">

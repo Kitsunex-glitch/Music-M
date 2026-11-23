@@ -18,6 +18,7 @@ namespace VkNet.Model.Attachments
 		/// <inheritdoc />
 		protected override string Alias => "audio_playlist";
 
+
 		/// <summary>
 		/// Тип плейлиста.
 		/// </summary>

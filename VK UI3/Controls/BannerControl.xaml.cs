@@ -29,20 +29,31 @@ namespace VK_UI3.Controls
         private void BannerControl_DataContextChanged(FrameworkElement sender, DataContextChangedEventArgs args)
         {
 
-            if (!(DataContext is ExpBanner banner)) return;
+            if (!(DataContext is ExpBanner banner))
+            {
+                // Контейнер переиспользован/выгружен: отписываемся от прежнего баннера.
+                if (connected && Banner != null)
+                {
+                    Banner.showedClick -= Banner_showedClick;
+                }
+
+                Banner = null;
+                connected = false;
+                return;
+            }
 
             if (Banner != banner)
             {
                 BannerCover.Source = null;
-                if (connected)
+                if (connected && Banner != null)
                 {
                     Banner.showedClick -= Banner_showedClick;
                 }
-            }
 
-            this.Banner = banner;
-            Banner.showedClick += Banner_showedClick;
-            connected = true;
+                this.Banner = banner;
+                Banner.showedClick += Banner_showedClick;
+                connected = true;
+            }
 
             BannerTitle.Text = banner.catalogBanner.Title;
             BannerText.Text = banner.catalogBanner.Text;
@@ -84,14 +95,16 @@ namespace VK_UI3.Controls
 
         private void BannerControl_Unloaded(object sender, RoutedEventArgs e)
         {
-            try
+            this.Unloaded -= BannerControl_Unloaded;
+            this.DataContextChanged -= BannerControl_DataContextChanged;
+
+            // Banner может быть null, если контрол выгрузился до назначения DataContext.
+            if (connected && Banner != null)
             {
-                this.Unloaded -= BannerControl_Unloaded;
-                this.DataContextChanged -= BannerControl_DataContextChanged;
                 Banner.showedClick -= Banner_showedClick;
             }
-            catch { }
 
+            connected = false;
         }
 
         Helpers.Animations.AnimationsChangeImage changeImage;
@@ -102,19 +115,11 @@ namespace VK_UI3.Controls
 
         private void Card_Tapped(object sender, RoutedEventArgs e)
         {
-            try
-            {
+            // Контрол мог остаться без DataContext после переиспользования/выгрузки.
+            if (Banner == null)
+                return;
 
-                Banner.invokeShowedClick(Banner);
-
-            
-
-            }
-            catch (Exception ex)
-            {
-
-            }
-
+            Banner.invokeShowedClick(Banner);
         }
 
        
@@ -122,7 +127,7 @@ namespace VK_UI3.Controls
         private void Card_PointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
         {
             entered = true;
-            if (Banner.selected) return;
+            if (Banner == null || Banner.selected) return;
             FadeOutStoryboard.Pause();
             FadeInStoryboard.Begin();
         }
@@ -130,7 +135,7 @@ namespace VK_UI3.Controls
         private void Card_PointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
         {
             entered = false;
-            if (Banner.selected) return;
+            if (Banner == null || Banner.selected) return;
             FadeInStoryboard.Pause();
             FadeOutStoryboard.Begin();
         }

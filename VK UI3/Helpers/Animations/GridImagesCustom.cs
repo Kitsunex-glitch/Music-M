@@ -45,7 +45,12 @@ namespace VK_UI3.Helpers.Animations
 
         public void AddImagesToGrid(List<string> photos)
         {
-            if (this.photos == photos) return;
+            if (photos == null)
+                return;
+
+            // Кеш работает только если в гриде уже есть картинки: после выгрузки/переиспользования
+            // контейнера Children пуст, и картинки нужно загрузить заново.
+            if (this.photos == photos && this.Children.Count > 0) return;
             this.photos = photos;
 
             DispatcherQueue.TryEnqueue(() =>
@@ -83,7 +88,12 @@ namespace VK_UI3.Helpers.Animations
 
         public void AddImagesToGrid(string photo)
         {
-            if (this.photo == photo) return;
+            if (string.IsNullOrEmpty(photo))
+                return;
+
+            // См. комментарий в перегрузке для List: без проверки Children картинка
+            // не вернётся после пересоздания контейнера вкладки.
+            if (this.photo == photo && this.Children.Count > 0) return;
             this.photo = photo;
 
             DispatcherQueue.TryEnqueue(() =>

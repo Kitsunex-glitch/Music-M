@@ -78,6 +78,9 @@
                 Grid.RowSpan="2"
                 Margin="0,0,0,0"
                 HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
+                HorizontalContentAlignment="Stretch"
+                VerticalContentAlignment="Stretch"
                 AutomationProperties.HelpText="Основное меню навигации приложения"
                 AutomationProperties.Name="Навигационное меню"
                 IsBackButtonVisible="Collapsed"
@@ -183,11 +186,57 @@
                         AutomationProperties.HelpText="Панель для поиска музыки и контента"
                         AutomationProperties.Name="Панель поиска"
                         OriginalHeight="50" />
-                    <krotos:NavigateFrame
-                        x:Name="ContentFrame"
+                    <Grid
+                        x:Name="TabsHost"
                         Grid.Row="1"
-                        AutomationProperties.HelpText="Область отображения основного содержимого"
-                        AutomationProperties.Name="Фрейм содержимого" />
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Stretch">
+                        <TabView
+                            x:Name="Tabs"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Stretch"
+                            AutomationProperties.HelpText="Вкладки с содержимым приложения. Ctrl+клик по пункту меню или карточке открывает новую вкладку"
+                            AutomationProperties.Name="Вкладки"
+                            CloseButtonOverlayMode="OnPointerOver"
+                            IsAddTabButtonVisible="True"
+                            SelectionChanged="Tabs_SelectionChanged"
+                            TabCloseRequested="Tabs_TabCloseRequested"
+                            TabWidthMode="SizeToContent">
+                            <TabView.TabStripHeader>
+                                <Grid Width="0" />
+                            </TabView.TabStripHeader>
+                        </TabView>
+                        <Grid
+                            x:Name="EmptyState"
+                            Background="{ThemeResource SystemControlAltHighAcrylicElementBrush}"
+                            Visibility="Collapsed">
+                            <StackPanel
+                                MaxWidth="420"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Spacing="8">
+                                <FontIcon
+                                    HorizontalAlignment="Center"
+                                    FontSize="36"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Glyph="&#xE7C4;" />
+                                <TextBlock
+                                    HorizontalAlignment="Center"
+                                    Style="{ThemeResource SubtitleTextBlockStyle}"
+                                    Text="Нет открытых вкладок" />
+                                <TextBlock
+                                    HorizontalAlignment="Center"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="Выберите раздел в меню слева, чтобы открыть его во вкладке."
+                                    TextAlignment="Center"
+                                    TextWrapping="Wrap" />
+                                <Button
+                                    HorizontalAlignment="Center"
+                                    Click="OpenHomeTab_Click"
+                                    Content="Моя музыка" />
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
                 </Grid>
             </NavigationView>
             <controlLyryc:LyricsPage

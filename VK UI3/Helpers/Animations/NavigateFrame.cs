@@ -79,6 +79,12 @@ namespace KrotosNavigationFrame
                 Frame frame = new Frame();
                 frame.Opacity = 0;
                 frame.ContentTransitions = [new NavigationThemeTransition()];
+                // Страница должна занимать всю область вкладки: иначе центрированные
+                // элементы (например, индикатор загрузки) считаются от размера контента.
+                frame.HorizontalAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Stretch;
+                frame.VerticalAlignment = Microsoft.UI.Xaml.VerticalAlignment.Stretch;
+                frame.HorizontalContentAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Stretch;
+                frame.VerticalContentAlignment = Microsoft.UI.Xaml.VerticalAlignment.Stretch;
 
                 // Добавляем новый фрейм поверх старых
                 this.Children.Add(frame);

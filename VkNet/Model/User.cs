@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using VkNet.Enums;
@@ -98,6 +99,18 @@ namespace VkNet.Model
                 Photo400Orig = response["photo_400_orig"],
                 PhotoMax = response["photo_max"],
                 PhotoMaxOrig = response["photo_max_orig"],
+                PhotoBase = response["photo_base"],
+                Activity = response["activity"],
+                University = response["university"],
+                UniversityName = response["university_name"],
+                Faculty = response["faculty"],
+                FacultyName = response["faculty_name"],
+                Graduation = response["graduation"],
+                IsNft = response["is_nft"],
+                IsEsiaVerified = response["is_esia_verified"],
+                IsTinkoffVerified = response["is_tinkoff_verified"],
+                IsSberVerified = response["is_sber_verified"],
+                OAuthVerification = response["oauth_verification"].ToReadOnlyCollectionOf<string>(x => x),
                 FollowersCount = response["followers_count"],
                 Occupation = response["occupation"],
                 Exports = response["exports"],
@@ -827,6 +840,102 @@ namespace VkNet.Model
 
         #endregion
 
+        #region Поля статуса и верификации профиля
+
+        /// <summary>
+        /// Статус активности пользователя (строка в профиле).
+        /// </summary>
+        [JsonProperty("activity")]
+        public string Activity { get; set; }
+
+        /// <summary>
+        /// Идентификатор основного учебного заведения (устаревшее поле профиля).
+        /// </summary>
+        [JsonProperty("university")]
+        public long? University { get; set; }
+
+        /// <summary>
+        /// Название основного учебного заведения.
+        /// </summary>
+        [JsonProperty("university_name")]
+        public string UniversityName { get; set; }
+
+        /// <summary>
+        /// Идентификатор факультета.
+        /// </summary>
+        [JsonProperty("faculty")]
+        public long? Faculty { get; set; }
+
+        /// <summary>
+        /// Название факультета.
+        /// </summary>
+        [JsonProperty("faculty_name")]
+        public string FacultyName { get; set; }
+
+        /// <summary>
+        /// Год окончания обучения.
+        /// </summary>
+        [JsonProperty("graduation")]
+        public long? Graduation { get; set; }
+
+        /// <summary>
+        /// У пользователя установлен NFT-аватар.
+        /// </summary>
+        [JsonProperty("is_nft")]
+        public bool? IsNft { get; set; }
+
+        /// <summary>
+        /// Профиль подтверждён через ЕСИА (Госуслуги).
+        /// </summary>
+        [JsonProperty("is_esia_verified")]
+        public bool? IsEsiaVerified { get; set; }
+
+        /// <summary>
+        /// Профиль подтверждён через Тинькофф.
+        /// </summary>
+        [JsonProperty("is_tinkoff_verified")]
+        public bool? IsTinkoffVerified { get; set; }
+
+        /// <summary>
+        /// Профиль подтверждён через Сбер.
+        /// </summary>
+        [JsonProperty("is_sber_verified")]
+        public bool? IsSberVerified { get; set; }
+
+        /// <summary>
+        /// Данные OAuth-верификации профиля (список способов подтверждения).
+        /// </summary>
+        [JsonProperty("oauth_verification")]
+        public ReadOnlyCollection<string> OAuthVerification { get; set; }
+
+        /// <summary>
+        /// URL базовой фотографии профиля (обычно наибольшее квадратное изображение).
+        /// </summary>
+        [JsonProperty("photo_base")]
+        public Uri PhotoBase { get; set; }
+
+        /// <summary>
+        /// Первое доступное фото профиля: берёт любое из полей фотографий,
+        /// начиная с наиболее подходящего (базовое → 100 → 200 → 50 → максимальное).
+        /// </summary>
+        [JsonIgnore]
+        public Uri Photo
+        {
+            get
+            {
+                return PhotoBase
+                       ?? Photo100
+                       ?? Photo200
+                       ?? Photo50
+                       ?? Photo200Orig
+                       ?? Photo400Orig
+                       ?? PhotoMax
+                       ?? PhotoMaxOrig;
+            }
+        }
+
+        #endregion
+
         #region Поля для Groups.GetMembers
 
         /// <summary>
@@ -872,7 +981,8 @@ namespace VkNet.Model
 
         #endregion
 
+        [JsonExtensionData]
+        public Dictionary<string, object> AdditionalData { get; set; }
 
-       
     }
 }
