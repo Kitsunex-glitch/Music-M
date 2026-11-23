@@ -268,9 +268,29 @@ namespace VK_UI3.Views.ModalsPages
             // Если страница выгружалась (репарент/навигация), таймер мог быть освобождён.
             EnsureTimerStarted();
 
-            // Обратное включение после Disable(): снова разрешаем отрисовку кадров.
-            LyricsView.IsLyricsVisible = true;
-            LyricsView.CurrentIsPlaying = IsPlayerPlaying();
+            // ВАЖНО: пока страница не подключена к визуальному дереву (или её CanvasControl
+            // уже уничтожен после Unloaded), обращаться к LyricsView нельзя — это даёт
+            // AccessViolation в нативном Win2D. В таком случае всё сделает OnLoaded.
+            if (IsLoaded)
+            {
+                // Обратное включение после Disable(): снова разрешаем отрисовку кадров.
+                LyricsView.IsLyricsVisible = true;
+                LyricsView.CurrentIsPlaying = IsPlayerPlaying();
+
+                // Disable() останавливает кадровый цикл BetterLyric (отписка от
+                // CompositionTarget.Rendering). При переключении вкладок повторного
+                // Loaded/OnApplyTemplate нет — без явного перезапуска текст после
+                // возврата на вкладку «Текст и очередь» не рисовался.
+                LyricsView.ResumeRenderLoop();
+
+                // Отдаём контролу актуальную позицию плеера, чтобы он сразу отрисовал
+                // текущую строку, а не ждал следующего тика таймера.
+                var mediaPlayer = VK_UI3.Services.MediaPlayerService.MediaPlayer;
+                if (mediaPlayer?.PlaybackSession != null)
+                {
+                    LyricsView.CurrentPosition = mediaPlayer.Position;
+                }
+            }
 
             // ВАЖНО: при репарент в полноэкранный режим OnLoaded уже отработал раньше,
             // когда страница была неактивна, поэтому текст для текущего трека ещё не загружен.

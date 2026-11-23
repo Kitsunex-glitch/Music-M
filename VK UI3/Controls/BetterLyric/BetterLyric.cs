@@ -37,12 +37,21 @@ public partial class BetterLyric : Control
     private const string PART_Canvas = "PART_Canvas";
     private const string PART_ScrollViewer = "PART_ScrollViewer";
     private const string PART_UntimedBadge = "PART_UntimedBadge";
+    private const string PART_Root = "PART_Root";
 
     // CanvasControl (не CanvasAnimatedControl): его composition-поверхность
     // поддерживает альфа-канал, поэтому канвас прозрачен и фон под ним виден.
     // Кадры двигает CompositionTarget.Rendering (см. BetterLyric.RenderLoop.cs).
     private CanvasControl canvas;
     private ScrollViewer _scrollViewer;
+
+    /// <summary>
+    /// Корневая панель шаблона. Нужна, чтобы вернуть <c>CanvasControl</c> в дерево:
+    /// <c>RemoveFromVisualTree()</c> (вызывается в <c>OnUnloaded</c>) отвязывает
+    /// элемент от Grid шаблона, и после повторного <c>Loaded</c> он остаётся вне
+    /// дерева — Win2D тогда не создаёт device и не рисует ни строки.
+    /// </summary>
+    private Panel? _templateRoot;
 
     /// <summary>Плашка-подсказка «текст без синхронизации».</summary>
     private FrameworkElement? _untimedBadge;
@@ -191,12 +200,19 @@ public partial class BetterLyric : Control
     {
         base.OnApplyTemplate();
 
+        // Корень шаблона: через него канвас возвращается в дерево после RemoveFromVisualTree().
+        _templateRoot = GetTemplateChild(PART_Root) as Panel;
+
         canvas = GetTemplateChild(PART_Canvas) as CanvasControl;
         if (canvas == null)
         {
             BetterLyricDebugLog.WriteAlways(BetterLyricLogCategory.Lifecycle, "OnApplyTemplate: PART_Canvas не найден!");
             return;
         }
+
+        // Канвас мог остаться вне дерева после предыдущего Unloaded — возвращаем его
+        // в Grid шаблона, иначе Win2D не создаст device и не нарисует ни строки.
+        EnsureCanvasInTemplateRoot();
 
         // Канвас прозрачен: очистка полностью прозрачным цветом (альфа = 0).
         canvas.ClearColor = Windows.UI.Color.FromArgb(0, 0, 0, 0);
@@ -242,6 +258,10 @@ public partial class BetterLyric : Control
 
         Unloaded -= OnUnloaded;
         Unloaded += OnUnloaded;
+
+        // Признак «контрол в дереве»: после Unloaded canvas уничтожается, и до повторного
+        // Loaded обращаться к нему нельзя (иначе AccessViolation в нативном Win2D).
+        _isAttachedToTree = true;
 
         // Контрол может быть перенесён в другое окно (репарент в полноэкранный плеер).
         // При этом приходит Unloaded (canvas освобождается), а затем повторный Loaded —
@@ -577,14 +597,26 @@ public partial class BetterLyric : Control
     /// </summary>
     private void OnLoaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
-        if (canvas != null)
-            return; // уже инициализирован (обычная первая загрузка — шаблон уже отработал)
+        _isAttachedToTree = true;
 
-        BetterLyricDebugLog.WriteAlways(BetterLyricLogCategory.Lifecycle, "OnLoaded: повторная инициализация после репарентa");
+        // Шаблон мог ещё не примениться — берём корень и канвас из него.
+        _templateRoot ??= GetTemplateChild(PART_Root) as Panel;
 
-        canvas = GetTemplateChild(PART_Canvas) as CanvasControl;
+        // ВАЖНО: раньше здесь был досрочный выход при canvas != null. Это ломало
+        // возврат на вкладку: OnUnloaded делает RemoveFromVisualTree(), но поле
+        // canvas не всегда обнуляется до повторного Loaded, а если канвас остался
+        // вне дерева — Win2D не создаёт device и не рисует ни строки.
+        // Поэтому сначала гарантируем, что канвас снова в шаблоне.
+        canvas ??= GetTemplateChild(PART_Canvas) as CanvasControl;
         if (canvas == null)
+        {
+            BetterLyricDebugLog.WriteAlways(BetterLyricLogCategory.Lifecycle, "OnLoaded: PART_Canvas не найден!");
             return;
+        }
+
+        EnsureCanvasInTemplateRoot();
+
+        BetterLyricDebugLog.WriteAlways(BetterLyricLogCategory.Lifecycle, "OnLoaded: переподключение канваса после загрузки");
 
         canvas.ClearColor = Windows.UI.Color.FromArgb(0, 0, 0, 0);
 
@@ -630,11 +662,74 @@ public partial class BetterLyric : Control
         // Раскладку строим на следующем тике: при репарентe размеры ещё нулевые
         // в момент Loaded, а к следующему тику контрол уже измерен.
         DispatcherQueue.TryEnqueue(TriggerRelayout);
+
+        // После возврата в дерево CanvasControl создаёт device не сразу: первый Draw
+        // приходит только при Invalidate(). Просим кадр, иначе поверхность остаётся пустой.
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            if (!_isAttachedToTree || canvas == null)
+                return;
+
+            TriggerRelayout();
+            canvas.Invalidate();
+        });
+    }
+
+    /// <summary>
+    /// Возвращает <c>CanvasControl</c> в Grid шаблона, если он был отвязан
+    /// (RemoveFromVisualTree в <see cref="OnUnloaded"/>). Без этого Win2D не создаёт
+    /// device, и после повторного Loaded текст не рисуется вовсе.
+    /// </summary>
+    private void EnsureCanvasInTemplateRoot()
+    {
+        if (canvas == null)
+            return;
+
+        // Корень шаблона мог быть пересоздан — перечитываем при необходимости.
+        if (_templateRoot == null || !ReferenceEquals(_templateRoot.Parent, this))
+            _templateRoot = GetTemplateChild(PART_Root) as Panel;
+
+        if (_templateRoot == null)
+            return;
+
+        if (ReferenceEquals(canvas.Parent, _templateRoot))
+            return;
+
+        // Элемент мог остаться у прежнего родителя (например, у уничтоженного Grid).
+        if (canvas.Parent is Panel oldPanel)
+        {
+            try
+            {
+                oldPanel.Children.Remove(canvas);
+            }
+            catch (System.Exception ex)
+            {
+                BetterLyricDebugLog.WriteAlways(
+                    BetterLyricLogCategory.Lifecycle,
+                    $"EnsureCanvasInTemplateRoot: не удалось отвязать канвас ({ex.GetType().Name})");
+            }
+        }
+
+        try
+        {
+            // Канвас должен быть под ScrollViewer'ом и плашкой — вставляем первым.
+            _templateRoot.Children.Insert(0, canvas);
+            BetterLyricDebugLog.WriteAlways(BetterLyricLogCategory.Lifecycle, "EnsureCanvasInTemplateRoot: канвас возвращён в дерево");
+        }
+        catch (System.Exception ex)
+        {
+            BetterLyricDebugLog.WriteAlways(
+                BetterLyricLogCategory.Lifecycle,
+                $"EnsureCanvasInTemplateRoot: не удалось вернуть канвас ({ex.GetType().Name}: {ex.Message})");
+        }
     }
 
     private void OnUnloaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
         BetterLyricDebugLog.WriteAlways(BetterLyricLogCategory.Lifecycle, "OnUnloaded: отписка и освобождение ресурсов");
+
+        // Контрол выходит из дерева: canvas будет уничтожен ниже.
+        _isAttachedToTree = false;
 
         StopRenderLoop();
         _isCanvasDeviceReady = false;

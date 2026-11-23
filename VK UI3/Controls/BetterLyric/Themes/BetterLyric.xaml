@@ -11,13 +11,18 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="local:BetterLyric">
-                    <Grid Background="Transparent">
+                    <Grid x:Name="PART_Root" Background="Transparent">
                         <!--
                             CanvasControl (НЕ CanvasAnimatedControl): его composition-поверхность
                             поддерживает альфа-канал, поэтому канвас действительно прозрачен и
                             фон контрола/окна под ним виден. Очистка задаётся ClearColor
                             (по умолчанию Transparent). Кадры двигает CompositionTarget.Rendering
                             (см. BetterLyric.RenderLoop.cs) с Invalidate().
+                        -->
+                        <!--
+                            Канвас растягивается по Grid шаблона (Stretch): жёсткая привязка
+                            Width/Height к TemplatedParent в WinUI нестабильна и приводила
+                            к нулевому размеру канваса — Win2D не рисовал ни строки.
                         -->
                         <win2d:CanvasControl
                             x:Name="PART_Canvas"

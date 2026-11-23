@@ -27,6 +27,56 @@ public partial class BetterLyric
     private readonly Stopwatch _renderClock = new();
 
     /// <summary>
+    /// Контрол подключён к визуальному дереву. Между <c>Unloaded</c> и повторным
+    /// <c>Loaded</c> <c>CanvasControl</c> уже уничтожен — обращаться к нему нельзя.
+    /// </summary>
+    private bool _isAttachedToTree;
+
+    /// <summary>
+    /// Перезапускает кадровый цикл, если он уже был инициализирован, но остановлен.
+    /// Нужно после <c>LyricsPage.Disable()/Enable()</c> (переключение вкладок):
+    /// подписка на <see cref="CompositionTarget.Rendering"/> к этому моменту снята,
+    /// а повторного <c>Loaded</c>/<c>OnApplyTemplate</c> не будет — без этого вызова
+    /// текст навсегда оставался «замороженным» после возврата на вкладку.
+    /// </summary>
+    internal void ResumeRenderLoop()
+    {
+        // ВАЖНО: проверять canvas == null недостаточно. После Unloaded поле обнуляется,
+        // но если контрол ещё не перезагрузился, ссылка могла остаться на уже уничтоженный
+        // Native-объект Win2D — обращение к нему даёт AccessViolation (0xC0000005).
+        // Перезапускаем цикл только когда контрол реально в дереве и canvas переподключён.
+        if (!_isAttachedToTree || canvas == null)
+            return;
+
+        StartRenderLoop();
+
+        // Сбрасываем отметку времени: после паузы дельта кадра не должна быть огромной.
+        _lastFrameTimestamp = 0;
+
+        // Поверхность Win2D после смены вкладки могла остаться без валидного кадра:
+        // содержимое не пересоздано, а старый кадр не показывается. Помечаем контент
+        // «грязным» и пересчитываем раскладку, затем принудительно запрашиваем отрисовку.
+        _isContentDirty = true;
+        _layoutSignature = null;
+        _isLayoutChanged = true;
+
+        RequestRelayout();
+
+        // Даём новому CanvasControl пройти measure/arrange, затем рисуем.
+        if (DispatcherQueue != null)
+        {
+            DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+            {
+                if (!_isAttachedToTree || canvas == null)
+                    return;
+
+                TriggerRelayout();
+                canvas.Invalidate();
+            });
+        }
+    }
+
+    /// <summary>
     /// <c>CanvasControl</c> создаёт <c>CanvasDevice</c> лениво — только при первом
     /// <c>Draw</c>/<c>CreateResources</c>. До этого любое создание Win2D-ресурсов
     /// (CanvasCommandList, CanvasTextLayout и т. п.) бросает ArgumentException
