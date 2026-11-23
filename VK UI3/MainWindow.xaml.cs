@@ -37,6 +37,7 @@ using Windows.Win32.Foundation;
 using Windows.Win32.UI.WindowsAndMessaging;
 using VK_UI3.Views.FullScreen;
 using VK_UI3.Views.ModalsPages;
+using VK_UI3.Views.Tabs;
 using WinRT.Interop;
 
 namespace VK_UI3
@@ -264,6 +265,17 @@ namespace VK_UI3
         private void FullScreenController_Exited(object sender, EventArgs e)
         {
             _isFullScreenPlayerActive = false;
+
+            // Окно плеера закрылось системно (Alt+F4/крестик): возвращаем оболочку
+            // главного окна и переносим вкладки плеера, если контроллер этого не сделал.
+            if (TabShellRegistry.FullScreen != null)
+            {
+                TabShellRegistry.TransferFullScreenTabsToMain();
+                TabShellRegistry.FullScreen = null;
+            }
+
+            ShellState.ResetToMain();
+
             if (_fullScreenController != null)
                 _fullScreenController.Exited -= FullScreenController_Exited;
         }

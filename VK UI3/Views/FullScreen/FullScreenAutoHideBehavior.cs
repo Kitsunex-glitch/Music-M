@@ -68,6 +68,13 @@ namespace VK_UI3.Views.FullScreen
         /// <summary>Оверлей сейчас скрыт (только текст на экране).</summary>
         public bool IsHidden => _isHidden;
 
+        /// <summary>
+        /// Видимость оверлея изменилась (<c>true</c> — показан, <c>false</c> — скрыт).
+        /// Нужно, чтобы другие элементы (лента вкладок) прятались/показывались
+        /// тем же механизмом, а не своим таймером.
+        /// </summary>
+        public event EventHandler<bool> VisibilityChanged;
+
         /// <summary>Цель fade-анимаций (панель управления).</summary>
         public FrameworkElement Target { get; private set; }
 
@@ -243,6 +250,7 @@ namespace VK_UI3.Views.FullScreen
             if (Target == null)
                 return;
 
+            bool wasHidden = _isHidden;
             _isHidden = false;
             Fade(1.0);
             SetHitTestVisible(true);
@@ -250,6 +258,9 @@ namespace VK_UI3.Views.FullScreen
             // Схлопнутые блоки раскрываются обратно: высота и отступы возвращаются.
             foreach (var entry in _collapsibles)
                 AnimateCollapse(entry, hidden: false);
+
+            if (wasHidden)
+                VisibilityChanged?.Invoke(this, true);
         }
 
         private void Hide()
@@ -266,6 +277,8 @@ namespace VK_UI3.Views.FullScreen
             {
                 AnimateCollapse(entry, hidden: true);
             }
+
+            VisibilityChanged?.Invoke(this, false);
         }
 
         /// <summary>

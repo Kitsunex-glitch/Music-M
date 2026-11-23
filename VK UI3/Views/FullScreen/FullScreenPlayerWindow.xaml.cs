@@ -13,6 +13,7 @@ using VK_UI3.Helpers;
 using VK_UI3.Helpers.Animations;
 using VK_UI3.Services;
 using VK_UI3.Views.ModalsPages;
+using VK_UI3.Views.Tabs;
 using Windows.Graphics;
 using Windows.System;
 
@@ -41,6 +42,9 @@ namespace VK_UI3.Views.FullScreen
         private bool _syncingSourceCombo;
         // Собственный экземпляр страницы текста для этого окна (не переносим из MainView).
         private LyricsPage _ownLyricsPage;
+        // Индекс источника текста, который нужно применить к вновь создаваемой странице
+        // (при пересоздании страницы после возврата на вкладку).
+        private int? _pendingLyricsSourceIndex;
         // Защита от рекурсии: SetSelectedSection меняет choosen, что снова вызывает onChangeSelected.
         private bool _syncingSwitcher;
         // Composition-анимации переключения разделов (Storyboard в коде без TargetName в WinUI 3
@@ -58,6 +62,10 @@ namespace VK_UI3.Views.FullScreen
 
             HookUpControls();
 
+            // Перенос сцены возможен только когда закреплённая вкладка уже создана
+            // в визуальном дереве TabView: до загрузки контейнер вкладки ещё не существует.
+            TabHost.Loaded += (s, e) => AttachStageToPinnedTab();
+
             _viewModel.PropertyChanged += ViewModel_PropertyChanged;
 
             RootGrid.KeyDown += RootGrid_KeyDown;
@@ -66,8 +74,104 @@ namespace VK_UI3.Views.FullScreen
             this.Closed += FullScreenPlayerWindow_Closed;
         }
 
+        /// <summary>
+        /// Переносит сцену «текст песни / очередь» в закреплённую вкладку хоста вкладок.
+        /// Экземпляры LyricsPage/QueuePane сохраняются (репарент, а не пересоздание).
+        /// </summary>
+        private void AttachStageToPinnedTab()
+        {
+            if (StageGrid == null)
+                return;
+
+            var pinnedRoot = TabHost?.PinnedContent as Panel;
+            if (pinnedRoot == null)
+            {
+                // Вкладка ещё не подключена к дереву — пробуем на следующем проходе диспетчера.
+                DispatcherQueue.TryEnqueue(AttachStageToPinnedTab);
+                return;
+            }
+
+            if (!ReferenceEquals(StageGrid.Parent, pinnedRoot))
+            {
+                // Сначала полностью убираем сцену из текущего дерева — WinUI не позволяет
+                // добавить элемент, у которого уже есть родитель (COMException 0x800F1000).
+                DetachFromParent(StageGrid);
+
+                try
+                {
+                    pinnedRoot.Children.Add(StageGrid);
+                }
+                catch (System.Runtime.InteropServices.COMException ex)
+                {
+                    // Контейнер вкладки ещё не активирован — повторим после загрузки.
+                    System.Diagnostics.Debug.WriteLine($"[FullScreenPlayerWindow] Attach stage postponed: {ex.Message}");
+                    DispatcherQueue.TryEnqueue(AttachStageToPinnedTab);
+                    return;
+                }
+            }
+
+            // В дереве сцена была скрыта (чтобы не перекрывать ленту до переноса) — показываем.
+            StageGrid.Visibility = Visibility.Visible;
+            StageGrid.HorizontalAlignment = HorizontalAlignment.Stretch;
+            StageGrid.VerticalAlignment = VerticalAlignment.Stretch;
+
+            TabHost.ActiveTabChanged -= TabHost_ActiveTabChanged;
+            TabHost.ActiveTabChanged += TabHost_ActiveTabChanged;
+        }
+
+        /// <summary>Отвязывает элемент от любого родителя (Grid/Panel/ContentControl).</summary>
+        private static void DetachFromParent(FrameworkElement element)
+        {
+            switch (element.Parent)
+            {
+                case Panel panel:
+                    panel.Children.Remove(element);
+                    break;
+                case ContentControl contentControl when ReferenceEquals(contentControl.Content, element):
+                    contentControl.Content = null;
+                    break;
+                case ContentPresenter presenter when ReferenceEquals(presenter.Content, element):
+                    presenter.Content = null;
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Переключатель «Текст/Очередь» (innexGridCh) и шапка живут внутри закреплённой
+        /// вкладки, поэтому при уходе на другую вкладку они просто не видны вместе с её
+        /// содержимым — прятать их отдельно не нужно. Здесь управляем только синхронизацией текста.
+        /// </summary>
+        private void TabHost_ActiveTabChanged(object sender, TabEntry e)
+        {
+            if (TabHost?.IsPinnedActive == true)
+            {
+                // Возврат на «Текст и очередь»: Win2D-канвас внутри скрытой вкладки теряет
+                // device и после показа не рисует строки. Надёжнее пересоздать страницу
+                // текста целиком, чем латать жизненный цикл CanvasControl.
+                if (!_isQueueShown)
+                    RecreateLyricsPage();
+
+                return;
+            }
+
+            // Уход на другую вкладку — останавливаем таймер/загрузку текста.
+            _ownLyricsPage?.Disable();
+        }
+
+        /// <summary>
+        /// Оверлей показан/скрыт (автоскрытие по бездействию мыши) — лента вкладок
+        /// уезжает и возвращается вместе с ним.
+        /// </summary>
+        private void AutoHide_VisibilityChanged(object sender, bool visible)
+        {
+            TabHost?.SetOverlayVisible(visible);
+        }
+
         /// <summary>Окно закрывается пользователем (кнопка, Esc, системное закрытие).</summary>
         public event EventHandler CloseRequested;
+
+        /// <summary>Оболочка вкладок этого окна (регистрируется в <see cref="TabShellRegistry"/>).</summary>
+        public ITabShell TabShellHost => TabHost;
 
         #region Lifecycle
 
@@ -118,17 +222,28 @@ namespace VK_UI3.Views.FullScreen
 
             _autoHide.Initialize(RootGrid, Controls);
 
-            // Панель действий над текстом и переключатель разделов живут вместе
-            // с остальным оверлеем: появляются при движении мыши, гаснут по таймауту.
+            // ВАЖНО: лента вкладок НЕ является целью автоскрытия (fade) — она не должна
+            // становиться прозрачной. Но прятаться/показываться она должна тем же
+            // механизмом, что и остальной оверлей: подписываемся на его видимость и
+            // сдвигаем ленту вверх/вниз синхронно с панелью управления.
+            // При единственной вкладке лента не выезжает никогда
+            // (см. FullScreenTabHost.SetOverlayVisible).
+            _autoHide.VisibilityChanged -= AutoHide_VisibilityChanged;
+            _autoHide.VisibilityChanged += AutoHide_VisibilityChanged;
+
+            // Шапка закреплённой вкладки (переключатель «Текст/Очередь» — innexGridCh
+            // и действия над текстом) переносится в стек вкладки вместе со сценой и живёт
+            // вместе с оверлеем: появляется при движении мыши, гаснет и «схлопывается» по таймауту.
             // (Кнопка выхода теперь только в панели управления внизу.)
             _autoHide.AddTarget(LyricsActionsPanel);
             _autoHide.AddTarget(SectionsSwitcher);
-
-            // Шапка правой панели (переключатель + действия над текстом) не просто
-            // гаснет, а плавно «схлопывается» по высоте и отступам.
             _autoHide.AddCollapsible(RightPaneHeader);
 
             _autoHide.Start();
+
+            // Стартовое состояние оверлея — лента вкладок подстраивается сразу,
+            // без ожидания первого события видимости.
+            TabHost?.SetOverlayVisible(!_autoHide.IsHidden);
 
             RootGrid.Focus(FocusState.Programmatic);
         }
@@ -136,6 +251,7 @@ namespace VK_UI3.Views.FullScreen
         /// <summary>Освобождает ресурсы окна. Экземпляр LyricsPage этого окна уничтожается вместе с ним.</summary>
         public void Cleanup()
         {
+            _autoHide.VisibilityChanged -= AutoHide_VisibilityChanged;
             _autoHide.Detach();
             _viewModel.Detach();
 
@@ -162,9 +278,50 @@ namespace VK_UI3.Views.FullScreen
                 return;
             }
 
-            _ownLyricsPage = new LyricsPage();
-            _ownLyricsPage.SetFullScreenMode(true);
-            LyricsHost.Content = _ownLyricsPage;
+            CreateLyricsPageCore();
+        }
+
+        /// <summary>
+        /// Создаёт новый экземпляр <see cref="LyricsPage"/>, помещает его в хост и включает
+        /// синхронизацию. Возвращает страницу (null — если создать не удалось).
+        /// </summary>
+        private LyricsPage CreateLyricsPageCore()
+        {
+            var page = new LyricsPage();
+            page.SetFullScreenMode(true);
+
+            // Источник текста, выбранный пользователем в окне плеера, переносим в новую
+            // страницу до первого показа — иначе он сбросился бы на значение из настроек.
+            if (_pendingLyricsSourceIndex is int sourceIndex)
+                page.SetLyricsSource(sourceIndex);
+
+            _ownLyricsPage = page;
+            LyricsHost.Content = page;
+            return page;
+        }
+
+        /// <summary>
+        /// Полностью пересоздаёт страницу текста. Win2D-канвас после скрытия вкладки
+        /// теряет device, и повторный показ ничего не рисует; новый экземпляр стартует
+        /// «с нуля» и гарантированно показывает текст.
+        /// </summary>
+        private void RecreateLyricsPage()
+        {
+            // Запоминаем выбор источника, чтобы он не потерялся при пересоздании.
+            _pendingLyricsSourceIndex = _ownLyricsPage?.LyricsSourceIndex;
+
+            if (_ownLyricsPage != null)
+            {
+                _ownLyricsPage.Disable();
+                _ownLyricsPage = null;
+            }
+
+            LyricsHost.Content = null;
+
+            var page = CreateLyricsPageCore();
+            page?.Enable();
+
+            SyncSourceCombo();
         }
 
         /// <summary>
@@ -289,10 +446,22 @@ namespace VK_UI3.Views.FullScreen
             switch (e.Key)
             {
                 case VirtualKey.Escape:
-                    if (_isQueueShown)
+                    // Esc на обычной вкладке закрывает её (как в браузере);
+                    // на закреплённой — прежнее поведение: очередь → текст → выход.
+                    if (TabHost != null && !TabHost.IsPinnedActive)
+                    {
+                        var active = TabHost.Manager?.ActiveTab;
+                        if (active != null && !active.IsPinned)
+                            TabHost.CloseRegularTab(active);
+                    }
+                    else if (_isQueueShown)
+                    {
                         ShowLyricsTab();
+                    }
                     else
+                    {
                         RequestClose();
+                    }
                     e.Handled = true;
                     break;
 
@@ -487,13 +656,21 @@ namespace VK_UI3.Views.FullScreen
         /// </summary>
         public void ShowLyricsTab()
         {
+            // «Текст песни» и «Очередь» живут в закреплённой вкладке: активируем её.
+            TabHost?.ActivatePinned();
             SetSelectedSection(queueIndex: 0);
 
-            // Включаем синхронизацию и загрузку текста — раздел действительно виден.
-            _ownLyricsPage?.Enable();
-
+            // Раздел уже открыт — пересоздавать нечего, просто следим за синхронизацией.
             if (!_isQueueShown)
-                return; // уже открыт текст
+            {
+                _ownLyricsPage?.Enable();
+                return;
+            }
+
+            // Переход «Очередь» → «Текст»: страница текста была скрыта (Disable) и её
+            // Win2D-канвас не отрисовывает строки после повторного показа. Пересоздаём
+            // страницу целиком — это надёжнее, чем ждать пересоздания device.
+            RecreateLyricsPage();
 
             _isQueueShown = false;
 
@@ -511,6 +688,7 @@ namespace VK_UI3.Views.FullScreen
         /// </summary>
         public void ShowQueueTab()
         {
+            TabHost?.ActivatePinned();
             SetSelectedSection(queueIndex: 1);
 
             if (_isQueueShown)
