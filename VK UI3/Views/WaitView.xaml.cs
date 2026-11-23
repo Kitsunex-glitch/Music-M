@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using VK_UI3.DB;
 using VK_UI3.Views.LoginWindow;
+using VK_UI3.Views.Tabs;
 using VK_UI3.Views.Share;
 using VK_UI3.VKs;
 using VK_UI3.VKs.IVK;
@@ -74,22 +75,28 @@ namespace VK_UI3.Views
             // Стек навигации теперь принадлежит вкладке: проверяем фрейм именно этой страницы,
             // а не активной вкладки (страница может жить в неактивной вкладке).
             var ownerFrame = this.Frame;
-            if (MainView.mainView == null || ownerFrame == null || ownerFrame.Content != this)
+            if (ownerFrame == null || ownerFrame.Content != this)
             {
                 return;
             }
 
-            // Находим вкладку, которой принадлежит эта страница, и её стек навигации.
-            var ownerTab = MainView.TabManager?.Tabs
-                .FirstOrDefault(t => t.ContentFrame?.frameCurrent?.Frame == ownerFrame);
-
-            if (ownerTab == null || !ReferenceEquals(ownerTab, MainView.ActiveTab))
+            // Вкладка может принадлежать главному окну или окну полноэкранного плеера —
+            // обновляем страницу, только если её вкладка активна в своей оболочке.
+            if (!IsActiveTabOf(MainView.TabManagerInstance, ownerFrame) &&
+                !IsActiveTabOf(TabShellRegistry.FullScreen?.Tabs, ownerFrame))
             {
                 return;
             }
 
             ShowLoadingOverlay(true);
             LoadAsync();
+        }
+
+        /// <summary>Фрейм принадлежит активной вкладке указанного реестра.</summary>
+        private static bool IsActiveTabOf(TabManager manager, Microsoft.UI.Xaml.Controls.Frame frame)
+        {
+            var active = manager?.ActiveTab;
+            return active != null && active.ContentFrame?.frameCurrent?.Frame == frame;
         }
 
         /// <summary>Показывает/скрывает оверлей-индикатор загрузки на всю область вкладки.</summary>
@@ -237,14 +244,18 @@ namespace VK_UI3.Views
                 });
                 ;
 
-                if (waitParameters.sectionType == SectionType.Search)
+                // Панель поиска есть только в главном окне: во вкладках полноэкранного
+                // плеера её нет, поэтому там строку поиска не трогаем.
+                if (MainView.mainView != null && !ShellState.IsFullScreen)
                 {
-                    MainView.mainView.showSearch();
-                }
-                else
-                {
-                    MainView.mainView.hideSearch();
-
+                    if (waitParameters.sectionType == SectionType.Search)
+                    {
+                        MainView.mainView.showSearch();
+                    }
+                    else
+                    {
+                        MainView.mainView.hideSearch();
+                    }
                 }
             }
             catch (Exception ex)

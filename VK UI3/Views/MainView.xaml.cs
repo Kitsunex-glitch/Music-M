@@ -14,6 +14,7 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
@@ -45,15 +46,15 @@ namespace VK_UI3.Views
     /// <summary>
     /// An empty page that can be used on its own or navigated to within a Frame.
     /// </summary>
-    public sealed partial class MainView : Microsoft.UI.Xaml.Controls.Page, INotifyPropertyChanged
+    public sealed partial class MainView : Microsoft.UI.Xaml.Controls.Page, INotifyPropertyChanged, ITabShell
     {
         public static MainView mainView;
 
-        /// <summary>Реестр вкладок (создаётся в конструкторе, доступен статическим хелперам).</summary>
-        public static TabManager TabManager { get; private set; }
+        /// <summary>Реестр вкладок главного окна (создаётся в конструкторе).</summary>
+        public static TabManager TabManagerInstance { get; private set; }
 
-        /// <summary>Активная вкладка.</summary>
-        public static TabEntry ActiveTab => TabManager?.ActiveTab;
+        /// <summary>Активная вкладка главного окна.</summary>
+        public static TabEntry ActiveTab => TabManagerInstance?.ActiveTab;
 
         /// <summary>Стек навигации активной вкладки (совместимость со старым API).</summary>
         public static NavigateFrame frame => ActiveTab?.ContentFrame;
@@ -61,19 +62,59 @@ namespace VK_UI3.Views
         /// <summary>Стек навигации активной вкладки.</summary>
         public NavigateFrame ContentFramePublic => ActiveTab?.ContentFrame;
 
+        /// <summary>DispatcherQueue главного окна (для создания источников вкладок).</summary>
+        public static DispatcherQueue DispatcherQueuePublic => dispatcherQueue;
+
+        /// <summary>Главное окно готово принимать контент.</summary>
+        private bool _isReady;
+
+        #region ITabShell
+
+        ShellKind ITabShell.Kind => ShellKind.Main;
+
+        TabManager ITabShell.Tabs => TabManagerInstance;
+
+        bool ITabShell.IsReady => _isReady;
+
+        /// <summary>Лента вкладок главного окна активна, пока открыт полноэкранный плеер.</summary>
+        bool ITabShell.IsTabStripEnabled => !ShellState.IsFullScreen;
+
+        bool ITabShell.OpenInTab(TabContent content, bool forceNew) => OpenContentInTab(content, forceNew);
+
+        bool ITabShell.Activate(TabKey key)
+        {
+            var entry = TabManagerInstance?.Find(key);
+            if (entry == null)
+                return false;
+
+            TabManagerInstance.Activate(entry);
+            return true;
+        }
+
+        bool ITabShell.Close(TabEntry entry) => TabManagerInstance?.Close(entry) ?? false;
+
+        IEnumerable<TabEntry> ITabShell.GetTransferableTabs()
+            => TabManagerInstance?.Tabs.Where(t => !t.IsPinned) ?? Enumerable.Empty<TabEntry>();
+
+        #endregion
+
         public MainView()
         {
             this.InitializeComponent();
 
 
             // FramePlayer.RenderTransform = trans;
-            TabManager = new TabManager(Tabs);
-            TabManager.HookTabViewEvents();
-            TabManager.ActiveTabChanged += TabManager_ActiveTabChanged;
-            TabManager.TabCreated += TabManager_TabCreated;
-            TabManager.CloseRequested += TabManager_CloseRequested;
-            TabManager.AddTabRequested += TabManager_AddTabRequested;
+            TabManagerInstance = new TabManager(Tabs);
+            TabManagerInstance.HookTabViewEvents();
+            TabManagerInstance.ActiveTabChanged += TabManager_ActiveTabChanged;
+            TabManagerInstance.TabCreated += TabManager_TabCreated;
+            TabManagerInstance.CloseRequested += TabManager_CloseRequested;
+            TabManagerInstance.AddTabRequested += TabManager_AddTabRequested;
             mainView = this;
+            TabShellRegistry.Main = this;
+
+            ShellState.ShellChanged += ShellState_ShellChanged;
+            ApplyShellState();
 
             //OpenMyPage(SectionType.MyListAudio);
 
@@ -97,9 +138,9 @@ namespace VK_UI3.Views
             TempPlayLists.TempPlayLists.updateNextRequest = true;
 
             // При смене аккаунта состояние всех вкладок невалидно: оставляем только домашнюю.
-            var home = TabManager?.Tabs.FirstOrDefault();
+            var home = TabManagerInstance?.Tabs.FirstOrDefault();
             if (home != null)
-                TabManager.CloseAllExcept(home);
+                TabManagerInstance.CloseAllExcept(home);
 
             if (ActiveTab?.ContentFrame?.Children.Count > 0)
             {
@@ -113,6 +154,7 @@ namespace VK_UI3.Views
 
         private void MainView_Unloaded(object sender, RoutedEventArgs e)
         {
+            _isReady = false;
             DetachActiveTab();
             NavWiv.BackRequested -= NavWiv_BackRequested;
             AccountsDB.ChanhgeActiveAccount -= ChangeAccount;
@@ -155,21 +197,12 @@ namespace VK_UI3.Views
         }
         private void OpenGenerator(CreatePlayList createPlayList)
         {
-            // Ctrl + «Создать плейлист» — вместо диалога открываем содержимое в новой вкладке.
+            // Ctrl + «Создать плейлист» — вместо диалога открываем содержимое в новой вкладке
+            // (в полноэкранном плеере — вкладкой его окна).
             if (InputState.IsCtrlPressed())
             {
-                var tab = TabManager.CreateAndActivate(
-                    new TabKey(SectionType.None, "create-playlist:" + Guid.NewGuid()),
-                    "Создание плейлиста",
-                    "\uE710");
-
-                tab.NavigationParameter = createPlayList;
-                tab.ContentFrame.Children.Add(new ScrollViewer
-                {
-                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                    Content = createPlayList
-                });
+                var shell = TabShellRegistry.Resolve();
+                shell?.OpenInTab(TabContentFactory.CreatePlaylist(createPlayList), forceNew: true);
                 return;
             }
 
@@ -254,8 +287,10 @@ namespace VK_UI3.Views
 
             this.Unloaded += MainView_Unloaded;
 
-            _ = CreateNavigation();
+            _isReady = true;
             dispatcherQueue = this.DispatcherQueue;
+
+            _ = CreateNavigation();
 
             ConfigureSettingsButtonAccessibility();
 
@@ -472,9 +507,9 @@ namespace VK_UI3.Views
             var token = _cts.Token;
 
             // Домашняя вкладка создаётся один раз; при пересоздании (смена аккаунта) — заново.
-            if (TabManager.Tabs.Count == 0)
+            if (TabManagerInstance.Tabs.Count == 0)
             {
-                var home = TabManager.CreateAndActivate(
+                var home = TabManagerInstance.CreateAndActivate(
                     new TabKey(SectionType.MyListAudio, string.Empty),
                     "Моя музыка",
                     "\uEC4F",
@@ -837,59 +872,24 @@ namespace VK_UI3.Views
         #region Tab-aware navigation
 
         /// <summary>
-        /// Открывает содержимое: при зажатом Ctrl — в новой вкладке, иначе в активной.
-        /// Если открытых вкладок нет — создаёт новую.
+        /// Открывает содержимое в активной оболочке: при зажатом Ctrl — в новой вкладке,
+        /// иначе в активной. Если открытых вкладок нет — создаёт новую.
+        /// В полноэкранном плеере вкладки создаются в его окне, а не в главном.
         /// </summary>
-        private static bool OpenInTab(WaitParameters parameters, TabKey key, string header, string glyph, bool forceNew)
+        private static bool OpenInTab(TabContent content, bool forceNew)
         {
-            if (mainView == null || TabManager == null)
+            if (content == null)
                 return false;
 
-            var manager = TabManager;
+            // Пока открыт полноэкранный плеер, вкладки главного окна не создаются:
+            // контент уходит во вкладки окна плеера.
+            if (ShellState.IsFullScreen)
+                return TabShellRegistry.Resolve()?.OpenInTab(content, forceNew) ?? false;
 
-            TabEntry tab = null;
-
-            if (!forceNew && key != null)
-            {
-                var existing = manager.Find(key);
-                if (existing != null)
-                {
-                    // Пустая вкладка (например, домашняя, созданная при старте, или
-                    // восстановленная) ещё без содержимого — грузим в неё контент.
-                    if (IsTabEmpty(existing))
-                    {
-                        tab = existing;
-                        manager.Activate(existing);
-                    }
-                    else
-                    {
-                        manager.Activate(existing);
-                        mainView.UpdateChromeForActiveTab();
-                        return true;
-                    }
-                }
-            }
-
-            if (tab == null)
-            {
-                tab = (forceNew || manager.ActiveTab == null)
-                    ? manager.CreateAndActivate(key, header, glyph)
-                    : manager.ActiveTab;
-            }
-
-            if (tab == null)
+            if (mainView == null)
                 return false;
 
-            tab.Key = key;
-            tab.NavigationParameter = parameters;
-            tab.Header = header;
-            tab.Glyph = glyph;
-            tab.ApplyHeader();
-
-            tab.ContentFrame.Navigate(typeof(WaitView), parameters, new DrillInNavigationTransitionInfo());
-            mainView.UpdateChromeForActiveTab();
-            mainView.UpdateEmptyState();
-            return true;
+            return mainView.OpenContentInTab(content, forceNew);
         }
 
         private static bool IsForceNewTab() => InputState.IsCtrlPressed();
@@ -915,7 +915,13 @@ namespace VK_UI3.Views
 
             var sectionView = new WaitParameters();
             sectionView.sectionType = sectionType;
-            OpenInTab(sectionView, new TabKey(sectionType, string.Empty), GetSectionHeader(sectionType), GetSectionGlyph(sectionType), IsForceNewTab());
+            OpenInTab(
+                TabContentFactory.Section(
+                    sectionView,
+                    new TabKey(sectionType, string.Empty),
+                    TabContentFactory.GetSectionHeader(sectionType),
+                    TabContentFactory.GetSectionGlyph(sectionType)),
+                IsForceNewTab());
         }
 
 
@@ -943,58 +949,52 @@ namespace VK_UI3.Views
                 _ => "\uEB51"
             };
 
-            OpenInTab(sectionView, new TabKey(SectionType.UserPlayListList, $"{id}|{openedPlayList}"), header, glyph, IsForceNewTab());
+            OpenInTab(
+                TabContentFactory.Section(
+                    sectionView,
+                    new TabKey(SectionType.UserPlayListList, $"{id}|{openedPlayList}"),
+                    header,
+                    glyph),
+                IsForceNewTab());
         }
         public static void OpenIVkAudio(IVKGetAudio iVKGetAudio)
         {
             CloseNowPlayingPanel();
 
-
-            var waitParameters = new WaitParameters();
-            waitParameters.sectionType = SectionType.CustomIVKGetAudio;
-            waitParameters.iVKGetAudio = iVKGetAudio;
-            OpenInTab(waitParameters, new TabKey(SectionType.CustomIVKGetAudio, iVKGetAudio?.GetHashCode().ToString()), "Плейлист", "\uE189", IsForceNewTab());
+            OpenInTab(
+                TabContentFactory.IVkAudio(
+                    iVKGetAudio,
+                    new TabKey(SectionType.CustomIVKGetAudio, iVKGetAudio?.GetHashCode().ToString()),
+                    "Плейлист",
+                    "\uE189"),
+                IsForceNewTab());
         }
 
         public static void OpenPlayList(AudioPlaylist playlist)
         {
             CloseNowPlayingPanel();
 
-
-            var waitParameters = new WaitParameters();
-            waitParameters.sectionType = SectionType.PlayList;
-            waitParameters.Playlist = playlist;
-            OpenInTab(waitParameters, BuildPlaylistKey(playlist), playlist?.Title ?? "Плейлист", "\uE189", IsForceNewTab());
+            OpenInTab(
+                TabContentFactory.Playlist(playlist, playlist?.Title ?? "Плейлист", "\uE189"),
+                IsForceNewTab());
         }
 
         public static void OpenPlayList(IVKGetAudio iVKGetAudio)
         {
             CloseNowPlayingPanel();
 
-
-            var sectionView = new WaitParameters();
-                sectionView.sectionType = SectionType.PlayList;
-                sectionView.iVKGetAudio = iVKGetAudio;
-            OpenInTab(sectionView, new TabKey(SectionType.PlayList, iVKGetAudio?.GetHashCode().ToString()), "Плейлист", "\uE189", IsForceNewTab());
+            OpenInTab(
+                TabContentFactory.PlaylistSource(iVKGetAudio, "Плейлист", "\uE189"),
+                IsForceNewTab());
         }
 
         public static void OpenPlayList(long AlbumID, long AlbumOwnerID, string? AlbumAccessKey = null)
         {
             CloseNowPlayingPanel();
 
-
-            var sectionView = new WaitParameters();
-            sectionView.sectionType = SectionType.PlayList;
-            MusicX.Core.Models.Playlist playlist = new MusicX.Core.Models.Playlist();
-            playlist.Id = AlbumID;
-            playlist.OwnerId = AlbumOwnerID;
-            if (!(AlbumAccessKey is null))
-                playlist.AccessKey = AlbumAccessKey;
-            PlayListVK playListVK = new PlayListVK(playlist, dispatcherQueue);
-            sectionView.iVKGetAudio = playListVK;
-
-            var key = new TabKey(SectionType.PlayList, $"{AlbumOwnerID}_{AlbumID}_{AlbumAccessKey}");
-            OpenInTab(sectionView, key, "Плейлист", "\uE189", IsForceNewTab());
+            OpenInTab(
+                TabContentFactory.PlaylistById(AlbumID, AlbumOwnerID, AlbumAccessKey, "Плейлист", "\uE189"),
+                IsForceNewTab());
         }
 
         public static void OpenSection(string sectionID, SectionType sectionType = SectionType.None)
@@ -1021,13 +1021,19 @@ namespace VK_UI3.Views
             }
 
             var tabHeader = string.IsNullOrWhiteSpace(header)
-                ? GetSectionHeader(sectionView.sectionType)
+                ? TabContentFactory.GetSectionHeader(sectionView.sectionType)
                 : header;
             var tabGlyph = string.IsNullOrWhiteSpace(glyph)
-                ? GetSectionGlyph(sectionView.sectionType)
+                ? TabContentFactory.GetSectionGlyph(sectionView.sectionType)
                 : glyph;
 
-            OpenInTab(sectionView, new TabKey(sectionView.sectionType, sectionID), tabHeader, tabGlyph, IsForceNewTab());
+            OpenInTab(
+                TabContentFactory.Section(
+                    sectionView,
+                    new TabKey(sectionView.sectionType, sectionID),
+                    tabHeader,
+                    tabGlyph),
+                IsForceNewTab());
         }
 
         public static void OpenSearchSection(string searchString)
@@ -1041,44 +1047,14 @@ namespace VK_UI3.Views
         
             sectionView.sectionType = SectionType.Search;
   
-            OpenInTab(sectionView, new TabKey(SectionType.Search, searchString), "Поиск", "\uE11A", IsForceNewTab());
+            OpenInTab(
+                TabContentFactory.Section(
+                    sectionView,
+                    new TabKey(SectionType.Search, searchString),
+                    "Поиск",
+                    "\uE11A"),
+                IsForceNewTab());
         }
-
-        private static TabKey BuildPlaylistKey(AudioPlaylist playlist)
-        {
-            if (playlist == null)
-                return new TabKey(SectionType.PlayList, Guid.NewGuid().ToString());
-
-            return new TabKey(SectionType.PlayList, $"{playlist.OwnerId}_{playlist.Id}_{playlist.AccessKey}");
-        }
-
-        private static string GetSectionHeader(SectionType type) => type switch
-        {
-            SectionType.MyListAudio => "Моя музыка",
-            SectionType.LoadFriends => "Музыка друзей",
-            SectionType.ConversDialogs => "Вложения",
-            SectionType.Artist => "Артист",
-            SectionType.UserSection => "Профиль",
-            SectionType.Search => "Поиск",
-            SectionType.UserPlayListList => "Плейлисты",
-            SectionType.PlayList => "Плейлист",
-            SectionType.WhatListening => "Что слушают",
-            _ => "Раздел"
-        };
-
-        private static string GetSectionGlyph(SectionType type) => type switch
-        {
-            SectionType.MyListAudio => "\uEC4F",
-            SectionType.LoadFriends => "\uE716",
-            SectionType.ConversDialogs => "\uE8F2",
-            SectionType.Artist => "\uE77B",
-            SectionType.UserSection => "\uE77B",
-            SectionType.Search => "\uE11A",
-            SectionType.UserPlayListList => "\uE93C",
-            SectionType.PlayList => "\uE189",
-            SectionType.WhatListening => "\uE783",
-            _ => "\uE10F"
-        };
 
 
         public void SearchSetText(string Text)
@@ -1086,14 +1062,23 @@ namespace VK_UI3.Views
             Search.searchtext = Text;
         }
 
-        public void showSearch() 
+        public void showSearch()
         {
+            // Пока строка поиска раскрыта, лента вкладок не должна уезжать вверх:
+            // её контейнер поднялся бы в область поиска и элементы наложились бы.
+            _isSearchExpanded = true;
+            UpdateTabStripVisibility();
+
             Search.Show();
         }
 
         public void hideSearch()
         {
             Search.Hide();
+
+            // Строка поиска ушла — возвращаем обычное поведение ленты вкладок.
+            _isSearchExpanded = false;
+            UpdateTabStripVisibility();
         }
 
         private void NavWiv_ItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs args)
@@ -1377,61 +1362,72 @@ namespace VK_UI3.Views
         private void OpenSettingsTab()
         {
             hideSearch();
-
-            if (!IsForceNewTab())
-            {
-                var existing = TabManager.Find(new TabKey(SectionType.None, "settings"));
-                if (existing != null)
-                {
-                    TabManager.Activate(existing);
-                    UpdateChromeForActiveTab();
-                    return;
-                }
-            }
-
-            var tab = IsForceNewTab()
-                ? TabManager.CreateAndActivate(new TabKey(SectionType.None, "settings"), "Параметры", "\uE713")
-                : ActiveTab ?? TabManager.CreateAndActivate(new TabKey(SectionType.None, "settings"), "Параметры", "\uE713");
-
-            tab.Key = new TabKey(SectionType.None, "settings");
-            tab.Header = "Параметры";
-            tab.Glyph = "\uE713";
-            tab.ApplyHeader();
-
-            tab.ContentFrame.Navigate(typeof(Settings.SettingsPage), null, new DrillInNavigationTransitionInfo());
-            UpdateChromeForActiveTab();
-            UpdateEmptyState();
+            OpenInTab(TabContentFactory.Settings(), IsForceNewTab());
         }
 
         /// <summary>Открывает «Что слушают» отдельной вкладкой (или активирует её).</summary>
         private void OpenWhatListeningTab()
         {
-            if (!IsForceNewTab())
-            {
-                var existing = TabManager.Find(new TabKey(SectionType.WhatListening, string.Empty));
-                if (existing != null)
-                {
-                    TabManager.Activate(existing);
-                    UpdateChromeForActiveTab();
-                    return;
-                }
-            }
-
-            var tab = IsForceNewTab()
-                ? TabManager.CreateAndActivate(new TabKey(SectionType.WhatListening, string.Empty), "Что слушают", "\uE783")
-                : ActiveTab ?? TabManager.CreateAndActivate(new TabKey(SectionType.WhatListening, string.Empty), "Что слушают", "\uE783");
-
-            tab.Key = new TabKey(SectionType.WhatListening, string.Empty);
-            tab.Header = "Что слушают";
-            tab.Glyph = "\uE783";
-            tab.ApplyHeader();
-
-            tab.ContentFrame.Navigate(typeof(WhatListeningPage), _whatListeningData, new DrillInNavigationTransitionInfo());
-            UpdateChromeForActiveTab();
-            UpdateEmptyState();
+            OpenInTab(TabContentFactory.WhatListening(_whatListeningData), IsForceNewTab());
         }
 
         #region Tab plumbing
+
+        /// <summary>
+        /// Открывает контент во вкладках главного окна.
+        /// При зажатом Ctrl или при отсутствии вкладок — создаёт новую,
+        /// иначе заменяет содержимое активной (pinned-вкладки не переиспользуются).
+        /// </summary>
+        private bool OpenContentInTab(TabContent content, bool forceNew)
+        {
+            if (content == null || TabManagerInstance == null)
+                return false;
+
+            var manager = TabManagerInstance;
+
+            // Вкладки главного окна заморожены (открыт полноэкранный плеер): не трогаем их.
+            if (ShellState.IsFullScreen)
+                return TabShellRegistry.Resolve()?.OpenInTab(content, forceNew) ?? false;
+
+            if (!forceNew && content.Key != null)
+            {
+                var existing = manager.Find(content.Key);
+                if (existing != null)
+                {
+                    if (IsTabEmpty(existing))
+                    {
+                        manager.Activate(existing);
+                    }
+                    else
+                    {
+                        manager.Activate(existing);
+                        UpdateChromeForActiveTab();
+                        return true;
+                    }
+                }
+            }
+
+            var active = manager.ActiveTab;
+            var canReuseActive = !forceNew && active != null && !active.IsPinned;
+
+            var tab = canReuseActive
+                ? active
+                : manager.CreateAndActivate(content.Key, content.Header, content.Glyph);
+
+            if (tab == null)
+                return false;
+
+            tab.Key = content.Key;
+            tab.Header = content.Header;
+            tab.Glyph = content.Glyph;
+            tab.ApplyHeader();
+
+            content.Navigate(tab);
+
+            UpdateChromeForActiveTab();
+            UpdateEmptyState();
+            return true;
+        }
 
         /// <summary>Подписывается на события активной вкладки (кнопка «Назад», поиск).</summary>
         private void AttachActiveTab()
@@ -1464,10 +1460,10 @@ namespace VK_UI3.Views
         /// <summary>Закрытие вкладки по кнопке закрытия или Ctrl+F4.</summary>
         private void TabManager_CloseRequested(object sender, TabEntry entry)
         {
-            if (entry == null || TabManager == null)
+            if (entry == null || TabManagerInstance == null || entry.IsPinned)
                 return;
 
-            TabManager.Close(entry);
+            TabManagerInstance.Close(entry);
 
             AttachActiveTab();
             UpdateChromeForActiveTab();
@@ -1512,11 +1508,13 @@ namespace VK_UI3.Views
         {
             try
             {
-                if (TabManager == null)
+                if (TabManagerInstance == null)
                     return;
 
-                var saved = TabManager.Tabs
-                    .Where(t => t.Key != null)
+                // Вкладки окна полноэкранного плеера не сохраняются: при выходе они
+                // переносятся в главное окно, а при закрытии приложения просто пропадают.
+                var saved = TabManagerInstance.Tabs
+                    .Where(t => t.Key != null && !t.IsPinned)
                     .Select(t => new SavedTab
                     {
                         Type = (int)t.Key.Type,
@@ -1551,7 +1549,7 @@ namespace VK_UI3.Views
                     return;
 
                 // Первая вкладка уже создана как домашняя (если пользователь не закрыл все вкладки).
-                var home = TabManager.Tabs.FirstOrDefault();
+                var home = TabManagerInstance.Tabs.FirstOrDefault();
                 TabEntry activeToRestore = null;
 
                 if (saved.Count == 1 && home != null && home.ContentFrame.Children.Count == 0)
@@ -1564,17 +1562,17 @@ namespace VK_UI3.Views
                         continue;
 
                     var key = new TabKey(type, item.Id);
-                    if (TabManager.Find(key) != null)
+                    if (TabManagerInstance.Find(key) != null)
                         continue;
 
-                    var tab = TabManager.Create(key, item.Header ?? "Раздел", item.Glyph, item.IsClosable);
+                    var tab = TabManagerInstance.Create(key, item.Header ?? "Раздел", item.Glyph, item.IsClosable);
                     tab.NeedsRestore = true;
                     if (item.IsActive)
                         activeToRestore = tab;
                 }
 
                 if (activeToRestore != null)
-                    TabManager.Activate(activeToRestore);
+                    TabManagerInstance.Activate(activeToRestore);
 
                 // Активация восстановленной вкладки подгружает её содержимое.
                 if (activeToRestore != null)
@@ -1592,49 +1590,7 @@ namespace VK_UI3.Views
             if (tab?.Key == null || !tab.NeedsRestore)
                 return;
 
-            switch (tab.Key.Type)
-            {
-                case SectionType.PlayList when tab.Key.Id.Contains('_'):
-                    var parts = tab.Key.Id.Split('_');
-                    if (parts.Length >= 2 &&
-                        long.TryParse(parts[0], out var ownerId) &&
-                        long.TryParse(parts[1], out var albumId))
-                    {
-                        var accessKey = parts.Length >= 3 && !string.IsNullOrEmpty(parts[2]) ? parts[2] : null;
-                        OpenPlayListInTab(tab, albumId, ownerId, accessKey);
-                    }
-                    break;
-
-                case SectionType.Search:
-                    var parameters = new WaitParameters
-                    {
-                        sectionType = SectionType.Search,
-                        SectionID = "search",
-                        searchText = tab.Key.Id
-                    };
-                    tab.NeedsRestore = false;
-                    tab.ContentFrame.Navigate(typeof(WaitView), parameters, new DrillInNavigationTransitionInfo());
-                    break;
-
-                default:
-                    var wait = new WaitParameters { sectionType = tab.Key.Type, SectionID = tab.Key.Id };
-                    tab.NeedsRestore = false;
-                    tab.ContentFrame.Navigate(typeof(WaitView), wait, new DrillInNavigationTransitionInfo());
-                    break;
-            }
-        }
-
-        /// <summary>Открывает плейлист в конкретной (восстановленной) вкладке.</summary>
-        private static void OpenPlayListInTab(TabEntry tab, long albumId, long ownerId, string accessKey)
-        {
-            var sectionView = new WaitParameters { sectionType = SectionType.PlayList };
-            var playlist = new MusicX.Core.Models.Playlist { Id = albumId, OwnerId = ownerId };
-            if (!string.IsNullOrEmpty(accessKey))
-                playlist.AccessKey = accessKey;
-
-            sectionView.iVKGetAudio = new PlayListVK(playlist, dispatcherQueue);
-            tab.NeedsRestore = false;
-            tab.ContentFrame.Navigate(typeof(WaitView), sectionView, new DrillInNavigationTransitionInfo());
+            TabContentFactory.RestoreInto(tab);
         }
 
         private sealed class SavedTab
@@ -1651,7 +1607,7 @@ namespace VK_UI3.Views
 
         private void Tabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (TabManager == null)
+            if (TabManagerInstance == null)
                 return;
 
             AttachActiveTab();
@@ -1661,11 +1617,11 @@ namespace VK_UI3.Views
 
         private void Tabs_TabCloseRequested(TabView sender, TabViewTabCloseRequestedEventArgs args)
         {
-            var entry = TabManager?.FromItem(args.Tab);
-            if (entry == null)
+            var entry = TabManagerInstance?.FromItem(args.Tab);
+            if (entry == null || entry.IsPinned)
                 return;
 
-            TabManager.Close(entry);
+            TabManagerInstance.Close(entry);
 
             AttachActiveTab();
             UpdateChromeForActiveTab();
@@ -1680,7 +1636,7 @@ namespace VK_UI3.Views
         /// </summary>
         private void TabManager_AddTabRequested(object sender, EventArgs e)
         {
-            var tab = TabManager.CreateAndActivate(
+            var tab = TabManagerInstance.CreateAndActivate(
                 new TabKey(SectionType.MyListAudio, $"new-{Guid.NewGuid()}"),
                 "Моя музыка",
                 "\uEC4F");
@@ -1700,11 +1656,47 @@ namespace VK_UI3.Views
             if (EmptyState == null)
                 return;
 
-            var isEmpty = TabManager == null || TabManager.Tabs.Count == 0;
+            var isEmpty = TabManagerInstance == null || TabManagerInstance.Tabs.Count == 0;
             EmptyState.Visibility = isEmpty ? Visibility.Visible : Visibility.Collapsed;
 
             UpdateTabStripVisibility();
         }
+
+        #region Shell state (fullscreen)
+
+        /// <summary>
+        /// Реакция главного окна на вход/выход из полноэкранного плеера:
+        /// лента вкладок замораживается (вкладки не создаются, не закрываются,
+        /// не переключаются), а Ctrl-навигация уходит во вкладки окна плеера.
+        /// </summary>
+        private void ShellState_ShellChanged(object sender, ShellKind kind)
+        {
+            ApplyShellState();
+        }
+
+        /// <summary>Приводит ленту вкладок главного окна в соответствие с <see cref="ShellState"/>.</summary>
+        private void ApplyShellState()
+        {
+            if (TabManagerInstance == null)
+                return;
+
+            var enabled = !ShellState.IsFullScreen;
+
+            TabManagerInstance.IsEnabled = enabled;
+            Tabs.IsAddTabButtonVisible = enabled;
+            Tabs.IsTabStop = enabled;
+
+            if (!enabled)
+            {
+                // Приводим ленту в нормальное положение, чтобы после выхода из плеера
+                // она не «выехала» наверх из-за схлопывания при одной вкладке.
+                UpdateTabStripVisibility();
+            }
+
+            UpdateEmptyState();
+        }
+
+        #endregion
 
         #region Tab strip collapse (one tab)
 
@@ -1723,6 +1715,13 @@ namespace VK_UI3.Views
         private bool _tabStripCollapsed;
 
         /// <summary>
+        /// Строка поиска сейчас раскрыта. Пока она видна, лента вкладок НЕ сворачивается:
+        /// иначе контейнер вкладок, поднятый вверх на место ленты, заезжает в область
+        /// строки поиска (Row 0) и элементы накладываются друг на друга.
+        /// </summary>
+        private bool _isSearchExpanded;
+
+        /// <summary>
         /// Скрывает ленту вкладок, когда открыта ровно одна вкладка: верхний Margin
         /// контейнера уводится в минус и контент поднимается на место ленты.
         /// </summary>
@@ -1731,7 +1730,13 @@ namespace VK_UI3.Views
             if (TabsHost == null)
                 return;
 
-            var shouldCollapse = TabManager != null && TabManager.Tabs.Count == 1;
+            // В полноэкранном плеере лента не схлопывается — просто скрыта вместе с контентом.
+            // Пока раскрыта строка поиска, ленту тоже не трогаем: иначе её контейнер
+            // уходит вверх и накладывается на панель поиска.
+            var shouldCollapse = !_isSearchExpanded
+                && TabManagerInstance != null
+                && TabManagerInstance.Tabs.Count == 1;
+
             if (shouldCollapse == _tabStripCollapsed)
                 return;
 
