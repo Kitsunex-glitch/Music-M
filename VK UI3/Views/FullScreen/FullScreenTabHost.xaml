@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="VK_UI3.Views.FullScreen.FullScreenTabHost"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    HorizontalAlignment="Stretch"
+    VerticalAlignment="Stretch"
+    AutomationProperties.HelpText="Вкладки полноэкранного плеера. Ctrl+клик по карточке открывает новую вкладку"
+    AutomationProperties.Name="Вкладки полноэкранного плеера"
+    mc:Ignorable="d">
+
+    <!--
+        Лента вкладок — прямой потомок UserControl (без промежуточного Grid): родитель
+        должен обрезать контент по своим границам, иначе сдвиг Margin вверх не скрывает ленту.
+        Величина сдвига задаётся в коде: FullScreenTabHost.TabStripShift (см. UpdateTabStripVisibility).
+    -->
+    <TabView
+        x:Name="Tabs"
+        HorizontalAlignment="Stretch"
+        VerticalAlignment="Stretch"
+        CloseButtonOverlayMode="OnPointerOver"
+        IsAddTabButtonVisible="False"
+        SelectionChanged="Tabs_SelectionChanged"
+        TabCloseRequested="Tabs_TabCloseRequested"
+        TabWidthMode="SizeToContent" />
+</UserControl>
