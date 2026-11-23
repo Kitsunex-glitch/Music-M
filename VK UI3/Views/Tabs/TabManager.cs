@@ -17,6 +17,7 @@ namespace VK_UI3.Views.Tabs
         private readonly TabView _tabView;
         private readonly List<TabEntry> _tabs = new();
         private bool _suspendSelectionSync;
+        private bool _isEnabled = true;
 
         public TabManager(TabView tabView)
         {
@@ -29,6 +30,27 @@ namespace VK_UI3.Views.Tabs
 
         /// <summary>Активная вкладка.</summary>
         public TabEntry ActiveTab { get; private set; }
+
+        /// <summary>
+        /// Лента вкладок активна. При <c>false</c> (например, главное окно при открытом
+        /// полноэкранном плеере) новые вкладки не создаются и вкладки не закрываются —
+        /// навигация идёт в уже активную вкладку.
+        /// </summary>
+        public bool IsEnabled
+        {
+            get => _isEnabled;
+            set
+            {
+                if (_isEnabled == value)
+                    return;
+
+                _isEnabled = value;
+                EnabledChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        /// <summary>Состояние <see cref="IsEnabled"/> изменилось.</summary>
+        public event EventHandler EnabledChanged;
 
         /// <summary>Пользователь переключил вкладку.</summary>
         public event EventHandler<TabEntry> ActiveTabChanged;
@@ -50,9 +72,13 @@ namespace VK_UI3.Views.Tabs
         /// <summary>
         /// Создаёт вкладку и добавляет её в ленту. Контент создаётся вызывающим кодом.
         /// </summary>
-        public TabEntry Create(TabKey key, string header, string glyph, bool isClosable = true)
+        public TabEntry Create(TabKey key, string header, string glyph, bool isClosable = true, bool isPinned = false)
         {
-            var entry = new TabEntry(key, header, glyph) { IsClosable = isClosable };
+            var entry = new TabEntry(key, header, glyph)
+            {
+                IsClosable = isClosable && !isPinned,
+                IsPinned = isPinned
+            };
 
             var frame = new NavigateFrame();
             // Контент вкладки должен занимать всю её площадь: иначе страницы
@@ -64,7 +90,7 @@ namespace VK_UI3.Views.Tabs
             var item = new TabViewItem
             {
                 Content = frame,
-                IsClosable = isClosable,
+                IsClosable = isClosable && !isPinned,
                 HorizontalContentAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Stretch,
                 VerticalContentAlignment = Microsoft.UI.Xaml.VerticalAlignment.Stretch,
                 IconSource = string.IsNullOrWhiteSpace(glyph)
@@ -82,9 +108,9 @@ namespace VK_UI3.Views.Tabs
         }
 
         /// <summary>Создаёт вкладку и сразу делает её активной.</summary>
-        public TabEntry CreateAndActivate(TabKey key, string header, string glyph, bool isClosable = true)
+        public TabEntry CreateAndActivate(TabKey key, string header, string glyph, bool isClosable = true, bool isPinned = false)
         {
-            var entry = Create(key, header, glyph, isClosable);
+            var entry = Create(key, header, glyph, isClosable, isPinned);
             Activate(entry);
             return entry;
         }
@@ -106,6 +132,10 @@ namespace VK_UI3.Views.Tabs
         public void Activate(TabEntry entry)
         {
             if (entry?.Item == null)
+                return;
+
+            // Неактивная лента: держим активной единственную текущую вкладку.
+            if (!_isEnabled && ActiveTab != null && !ReferenceEquals(ActiveTab, entry))
                 return;
 
             if (!ReferenceEquals(ActiveTab, entry))
@@ -154,6 +184,10 @@ namespace VK_UI3.Views.Tabs
             if (entry == null || !_tabs.Contains(entry))
                 return false;
 
+            // Закреплённую вкладку закрыть нельзя ни кнопкой, ни Ctrl+F4, ни кодом.
+            if (entry.IsPinned)
+                return false;
+
             var index = _tabs.IndexOf(entry);
             _tabs.Remove(entry);
 
@@ -194,6 +228,15 @@ namespace VK_UI3.Views.Tabs
             }
         }
 
+        /// <summary>Закрывает все незакреплённые вкладки.</summary>
+        public void CloseAllUnpinned()
+        {
+            foreach (var tab in _tabs.Where(t => !t.IsPinned).ToList())
+            {
+                Close(tab, allowLast: true);
+            }
+        }
+
         #endregion
 
         #region TabView events
@@ -212,7 +255,26 @@ namespace VK_UI3.Views.Tabs
             if (_tabView.SelectedItem is TabViewItem item)
             {
                 var entry = FromItem(item);
-                if (entry != null && !ReferenceEquals(ActiveTab, entry))
+                if (entry == null)
+                    return;
+
+                // Лента заморожена (главное окно при открытом полноэкранном плеере):
+                // пользовательские переключения игнорируются — возвращаем активную вкладку.
+                if (!_isEnabled && ActiveTab != null && !ReferenceEquals(ActiveTab, entry))
+                {
+                    _suspendSelectionSync = true;
+                    try
+                    {
+                        _tabView.SelectedItem = ActiveTab.Item;
+                    }
+                    finally
+                    {
+                        _suspendSelectionSync = false;
+                    }
+                    return;
+                }
+
+                if (!ReferenceEquals(ActiveTab, entry))
                 {
                     ActiveTab = entry;
                     ActiveTabChanged?.Invoke(this, entry);
@@ -223,7 +285,7 @@ namespace VK_UI3.Views.Tabs
         private void TabView_TabCloseRequested(TabView sender, TabViewTabCloseRequestedEventArgs args)
         {
             var entry = args.Tab != null ? FromItem(args.Tab) : FindByItem(args.Item as TabViewItem);
-            if (entry == null)
+            if (entry == null || entry.IsPinned)
                 return;
 
             CloseRequested?.Invoke(this, entry);
@@ -231,6 +293,9 @@ namespace VK_UI3.Views.Tabs
 
         private void TabView_AddTabButtonClick(TabView sender, object args)
         {
+            if (!_isEnabled)
+                return;
+
             AddTabRequested?.Invoke(this, EventArgs.Empty);
         }
 

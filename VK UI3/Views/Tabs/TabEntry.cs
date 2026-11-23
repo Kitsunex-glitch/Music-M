@@ -38,6 +38,12 @@ namespace VK_UI3.Views.Tabs
         /// <summary>Можно ли закрыть вкладку пользователю (домашняя — нет).</summary>
         public bool IsClosable { get; set; } = true;
 
+        /// <summary>
+        /// Закреплённая вкладка (например, «Текст и очередь» в полноэкранном плеере):
+        /// всегда первая, не закрывается и не заменяется другим содержимым.
+        /// </summary>
+        public bool IsPinned { get; set; }
+
         /// <summary>Флаг восстановления: содержимое загружается при первой активации.</summary>
         public bool NeedsRestore { get; set; }
 
