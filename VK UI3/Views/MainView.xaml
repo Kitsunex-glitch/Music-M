@@ -185,7 +185,8 @@
                         Margin="0"
                         AutomationProperties.HelpText="Панель для поиска музыки и контента"
                         AutomationProperties.Name="Панель поиска"
-                        OriginalHeight="50" />
+                        OriginalHeight="50"
+                        OriginalMargin="0,8,0,8" />
                     <Grid
                         x:Name="TabsHost"
                         Grid.Row="1"
