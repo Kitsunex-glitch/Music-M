@@ -295,6 +295,101 @@ namespace VK_UI3.Views.LoginWindow
             }
         }
 
+        #region Вход по access_token
+
+        private const int MinTokenLength = 20;
+
+        /// <summary>Поле токена каждый раз начинается с пустого значения и без старой ошибки.</summary>
+        private void TokenFlyout_Opening(object sender, object e)
+        {
+            if (TokenErrorTextBlock != null)
+                TokenErrorTextBlock.Visibility = Visibility.Collapsed;
+
+            if (TokenTextBox != null)
+            {
+                TokenTextBox.Password = string.Empty;
+                TokenTextBox.Focus(FocusState.Programmatic);
+            }
+        }
+
+        private void TokenCancelButton_Click(object sender, RoutedEventArgs e)
+        {
+            // Закрываем всплывающую панель, ничего не отправляя.
+            if (TokenLoginButton?.Flyout is Flyout flyout)
+                flyout.Hide();
+        }
+
+        /// <summary>
+        /// Вход по готовому access_token: токен проверяется, записывается в активный аккаунт
+        /// и приложение переходит в главное окно (без логина, пароля и 2FA).
+        /// </summary>
+        private void TokenLoginButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (TokenErrorTextBlock != null)
+                TokenErrorTextBlock.Visibility = Visibility.Collapsed;
+
+            // Токен часто копируют с переводами строк и пробелами — чистим их.
+            var token = (TokenTextBox?.Password ?? string.Empty)
+                .Replace("\r", string.Empty)
+                .Replace("\n", string.Empty)
+                .Replace(" ", string.Empty)
+                .Trim();
+
+            if (!TryValidateToken(token, out var error))
+            {
+                ShowTokenError(error);
+                return;
+            }
+
+            if (TokenLoginButton?.Flyout is Flyout flyout)
+                flyout.Hide();
+
+            Frame.Navigate(typeof(waitPage), this, new DrillInNavigationTransitionInfo());
+            _ = new VKAuth(this).LoginWithTokenAsync(token);
+        }
+
+        private static bool TryValidateToken(string token, out string error)
+        {
+            error = null;
+
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                error = "Введите токен";
+                return false;
+            }
+
+            if (token.Length < MinTokenLength)
+            {
+                error = "Токен слишком короткий — проверьте, что скопирован полностью";
+                return false;
+            }
+
+            return true;
+        }
+
+        private void ShowTokenError(string message)
+        {
+            if (TokenErrorTextBlock == null)
+                return;
+
+            TokenErrorTextBlock.Text = message;
+            TokenErrorTextBlock.Visibility = Visibility.Visible;
+        }
+
+        /// <summary>
+        /// Ошибка входа по токену: показываем её прямо во всплывающей панели
+        /// и открываем панель повторно, чтобы не искать кнопку заново.
+        /// </summary>
+        public void ShowTokenLoginError(string message)
+        {
+            ShowTokenError(message ?? "Не удалось выполнить вход по токену");
+
+            if (TokenLoginButton?.Flyout is Flyout flyout)
+                flyout.ShowAt(TokenLoginButton);
+        }
+
+        #endregion
+
         public void SendArgs(ArgSender argSender)
         {
             errorTextBlock.Text = argSender.ErrorText;

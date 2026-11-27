@@ -508,6 +508,157 @@ namespace VK_UI3.VKs
             }
         }
 
+        /// <summary>
+        /// Вход по готовому access_token: без логина, пароля и 2FA.
+        /// <para>
+        /// Токен сначала проверяется запросом <c>users.get</c> — только после успешной
+        /// проверки он попадает в БД. При ошибке пользователь возвращается на форму
+        /// входа, а всплывающая панель токена открывается с текстом ошибки.
+        /// </para>
+        /// </summary>
+        public async Task LoginWithTokenAsync(string? accessToken)
+        {
+            var token = accessToken?.Trim();
+
+            if (string.IsNullOrEmpty(token))
+            {
+                FailToTokenLogin("Введите токен");
+                return;
+            }
+
+            var account = AccountsDB.activeAccount;
+            var previousToken = account.Token;
+            var previousExchange = account.ExchangeToken;
+
+            try
+            {
+                // 1. Подставляем токен и проверяем его запросом к API.
+                account.Token = token;
+                account.Update();
+
+                var profile = (await api.Users.GetAsync(new List<long> { }, ProfileFields.PhotoMax))
+                    .FirstOrDefault();
+
+                if (profile == null)
+                {
+                    throw new InvalidOperationException("Токен недействителен или не имеет прав на профиль");
+                }
+
+                // 2. Профиль: id, имя и фото — как в обычном входе (LoggedInAsync).
+                account.id = profile.Id;
+                account.Name = $"{profile.FirstName} {profile.LastName}".Trim();
+                account.UserPhoto = (profile.PhotoMax ?? profile.Photo400Orig ?? profile.Photo200Orig
+                                     ?? profile.Photo200 ?? profile.Photo100
+                                     ?? new Uri("https://vk.ru/images/camera_200.png")).ToString();
+                account.Active = true;
+                account.Update();
+                AccountsDB.ActivateAccount(account.id);
+
+                // 3. Exchange token нужен для Boom; для «ручного» токена может быть недоступен,
+                //    поэтому вход из-за него не прерываем.
+                try
+                {
+                    var exchangeResponse = await _authCategory.GetExchangeToken();
+                    if (!string.IsNullOrEmpty(exchangeResponse?.ExchangeToken))
+                    {
+                        account.ExchangeToken = exchangeResponse.ExchangeToken;
+                        account.Update();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[VKAuth] Exchange token недоступен: {ex.GetType().Name}: {ex.Message}");
+                }
+
+                // 4. Токен Boom — тоже необязательный шаг.
+                try
+                {
+                    await BoomUpdateToken();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[VKAuth] Токен Boom не получен: {ex.GetType().Name}: {ex.Message}");
+                }
+
+                // 5. Статистика входа (как в LoggedInAsync).
+                try
+                {
+                    var packageVersion = Assembly.GetExecutingAssembly().GetName().Version;
+                    var version = $"{packageVersion.Major}.{packageVersion.Minor}.{packageVersion.Build}.{packageVersion.Revision}";
+                    var listParams = new List<EventParams>
+                    {
+                        new EventParams("Accounts Count", AccountsDB.GetAllAccounts().Count),
+                        new EventParams("versionAPP", version),
+                        new EventParams("LoginWay", "token"),
+                    };
+
+                    Event @event = new Event("LoginVK", DateTime.Now, eventParams: listParams);
+                    _ = new MusicMStatDefaultGate().SendEvent(@event);
+                }
+                catch
+                {
+                    // Статистика не должна влиять на вход.
+                }
+
+                _ = login.Frame.Navigate(typeof(MainView), null, new DrillInNavigationTransitionInfo());
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[VKAuth] Ошибка входа по токену: {ex.GetType().Name}: {ex.Message}");
+
+                // Токен не подошёл — возвращаем прежнее состояние аккаунта,
+                // чтобы не остался недействительный токен или мусорная запись.
+                try
+                {
+                    account.Token = previousToken;
+                    account.ExchangeToken = previousExchange;
+                    account.Update();
+                }
+                catch (Exception restoreEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[VKAuth] Не удалось откатить токен: {restoreEx.Message}");
+                }
+
+                FailToTokenLogin(ex is VkNet.Exception.VkAuthorizationException or VkNet.Exception.VkApiException
+                    ? "Токен недействителен или истёк"
+                    : $"Не удалось войти по токену: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Возвращает пользователя на форму входа и открывает панель ввода токена с ошибкой.
+        /// </summary>
+        private void FailToTokenLogin(string? message)
+        {
+            var errorText = message ?? "Не удалось выполнить вход по токену";
+
+            try
+            {
+                if (login?.Frame is ExtendFrame frame && frame.CanGoBack)
+                {
+                    frame.GoBack(new ArgSender { ErrorText = errorText });
+                    login.DispatcherQueue.TryEnqueue(() => login.ShowTokenLoginError(errorText));
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[VKAuth] Не удалось вернуться на страницу входа: {ex.Message}");
+            }
+
+            try
+            {
+                login?.Frame?.Navigate(typeof(Login));
+                login?.DispatcherQueue.TryEnqueue(() => login.ShowTokenLoginError(errorText));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[VKAuth] Не удалось открыть страницу входа: {ex.Message}");
+            }
+        }
+
         private async Task LoggedInAsync()
         {
             try

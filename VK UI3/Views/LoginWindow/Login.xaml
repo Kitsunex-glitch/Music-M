@@ -93,6 +93,67 @@
                     Content="Войти"
                     Style="{StaticResource AccentButtonStyle}" />
 
+                <!--
+                    Вход по готовому access_token: без логина, пароля и 2FA.
+                    Токен вводится в отдельной всплывающей панели, чтобы форма
+                    не разрасталась и поле не путалось с полем логина.
+                -->
+                <Button
+                    x:Name="TokenLoginButton"
+                    Margin="0,8,0,0"
+                    HorizontalAlignment="Stretch"
+                    AutomationProperties.HelpText="Вход без логина и пароля — по готовому access_token VK"
+                    AutomationProperties.Name="Войти по токену"
+                    Content="Войти по токену">
+                    <Button.Flyout>
+                        <Flyout Placement="Bottom" Opening="TokenFlyout_Opening">
+                            <StackPanel
+                                Width="360"
+                                Spacing="10"
+                                Padding="4">
+                                <TextBlock
+                                    FontWeight="SemiBold"
+                                    Text="Вход по access_token" />
+                                <TextBlock
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="Вставьте access_token VK с правами audio. Токен хранится только на этом устройстве."
+                                    TextWrapping="Wrap" />
+                                <!--
+                                    PasswordBox, а не TextBox: токен не должен отображаться
+                                    на экране (нет свойства PasswordRevealMode у TextBox).
+                                -->
+                                <PasswordBox
+                                    x:Name="TokenTextBox"
+                                    AutomationProperties.Name="Поле ввода токена"
+                                    Height="40"
+                                    PlaceholderText="vk1.a..." />
+                                <TextBlock
+                                    x:Name="TokenErrorTextBlock"
+                                    Foreground="Red"
+                                    TextWrapping="WrapWholeWords"
+                                    Visibility="Collapsed" />
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Button
+                                        Grid.Column="0"
+                                        HorizontalAlignment="Stretch"
+                                        Click="TokenLoginButton_Click"
+                                        Content="Войти"
+                                        Style="{StaticResource AccentButtonStyle}" />
+                                    <Button
+                                        Grid.Column="1"
+                                        HorizontalAlignment="Stretch"
+                                        Click="TokenCancelButton_Click"
+                                        Content="Отмена" />
+                                </Grid>
+                            </StackPanel>
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
+
                 <Button
                     x:Name="BackBTN"
                     Margin="0,20,0,0"

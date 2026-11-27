@@ -59,8 +59,11 @@ namespace MusicX.Core.Models
         [JsonProperty("mix_id")]
         public string MixId { get; set; }
         
+        // entity_id может быть как числом (владелец/пользователь), так и строкой
+        // вида "owner_id_audio_id" (например "-2001486552_156486552"),
+        // поэтому храним как строку.
         [JsonProperty("entity_id")]
-        public long EntityId { get; set; }
+        public string EntityId { get; set; }
 
         [JsonProperty("mix_options")]
         public string? MixOptions { get; set; }
