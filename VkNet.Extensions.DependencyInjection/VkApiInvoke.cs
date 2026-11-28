@@ -13,6 +13,8 @@ namespace VkNet.Extensions.DependencyInjection;
 
 public class VkApiInvoke : IVkApiInvoke
 {
+    // Канонический домен VK API. На api.vk.ru execute.resolveScreenName
+    // возвращает webview_url для мини-приложений (на api.vk.ru бывает null).
     private readonly Uri _apiBaseUri = new("https://api.vk.ru/method/");
     private readonly IEnumerable<JsonConverter> _defaultConverters = new JsonConverter[]
     {

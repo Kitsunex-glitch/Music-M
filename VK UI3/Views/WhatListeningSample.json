@@ -7,26 +7,26 @@
         "Name": "Лучшее из 2000-х",
         "Avatar": "https://example.com/covers/pl1.jpg",
         "Type": "Playlist",
-        "Url": "https://vk.com/audio?playlist=-123456_789"
+        "Url": "https://vk.ru/audio?playlist=-123456_789"
       },
       {
         "Name": "Макс Корж",
         "Avatar": "https://example.com/artists/artist1.jpg",
         "Type": "Artist",
-        "Url": "https://vk.com/artist/maxkorzh"
+        "Url": "https://vk.ru/artist/maxkorzh"
       },
       {
         "Name": "Новинки",
         "Avatar": "https://example.com/covers/pl3.jpg",
         "Type": "Playlist",
-        "Url": "https://vk.com/audio?playlist=-654321_987"
+        "Url": "https://vk.ru/audio?playlist=-654321_987"
       }
     ],
     "SocialLinks": [
       {
         "Name": "ВКонтакте",
         "LinkType": "VK",
-        "Url": "https://vk.com/ivanov"
+        "Url": "https://vk.ru/ivanov"
       },
       {
         "Name": "Telegram",
@@ -48,19 +48,19 @@
         "Name": "Джаз для души",
         "Avatar": "https://example.com/covers/pl4.jpg",
         "Type": "Playlist",
-        "Url": "https://vk.com/audio?playlist=-111222_333"
+        "Url": "https://vk.ru/audio?playlist=-111222_333"
       },
       {
         "Name": "Miles Davis",
         "Avatar": "https://example.com/artists/artist2.jpg",
         "Type": "Artist",
-        "Url": "https://vk.com/artist/milesdavis"
+        "Url": "https://vk.ru/artist/milesdavis"
       },
       {
         "Name": "Kind of Blue",
         "Avatar": "https://example.com/albums/alb1.jpg",
         "Type": "Album",
-        "Url": "https://vk.com/audio?album=-111222_444"
+        "Url": "https://vk.ru/audio?album=-111222_444"
       }
     ],
     "SocialLinks": [

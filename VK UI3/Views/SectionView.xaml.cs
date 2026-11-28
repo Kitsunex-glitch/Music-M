@@ -147,6 +147,7 @@ namespace VK_UI3.Views
             LoadFriends,
             CustomIVKGetAudio,
             WhatListening,
+            MiniApp,
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)

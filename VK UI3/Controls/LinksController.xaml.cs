@@ -136,15 +136,34 @@ namespace VK_UI3.Controls
                             return;
                         }
 
-                        match = IsMiniAppUrl(link.Url);
-
-                        if (match)
+                        if (IsMiniAppUrl(link.Url, out var miniAppId))
                         {
-                           // var appId = match.Groups["app"].Value;
-                           // var miniAppResponse = await vkService.GetMiniApp(appId, link.Url);
+                            string webviewUrl = null;
 
-                          //  navigationService.OpenExternalPage(new MiniAppView(new MiniAppViewModel(appId, miniAppResponse.Object.WebviewUrl)));
-                           // return;
+                            try
+                            {
+                                var miniAppResponse = await VK.vkService.GetMiniApp(miniAppId, link.Url);
+
+                                // webview_url для обычных мини-приложений; для игр он бывает null —
+                                // тогда используем EmbeddedUri.ViewUrl.
+                                webviewUrl = miniAppResponse?.Object?.WebviewUrl;
+                                if (string.IsNullOrEmpty(webviewUrl))
+                                    webviewUrl = miniAppResponse?.EmbeddedUri?.ViewUrl;
+                            }
+                            catch (System.Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine(
+                                    $"[LinksController] GetMiniApp {miniAppId} failed: {ex.Message}");
+                            }
+
+                            // Фолбэк: VK не отдаёт webview_url для части приложений —
+                            // открываем стандартный адрес, мост поднимется сам.
+                            if (string.IsNullOrEmpty(webviewUrl))
+                                webviewUrl = $"https://vk.ru/{miniAppId}";
+
+                            var header = string.IsNullOrWhiteSpace(link.Title) ? "Мини-приложение" : link.Title;
+                            MainView.OpenMiniApp(miniAppId, webviewUrl, header);
+                            return;
                         }
 
                         // ураа костыль для "Настроить рекомендации"
@@ -297,7 +316,14 @@ namespace VK_UI3.Controls
 
         static bool IsMiniAppUrl(string url)
         {
-            return Regex.IsMatch(url, @"https://vk\.com/(?<app>app\-?[0-9]+)(?>[\?\#].+)?$");
+            return Regex.IsMatch(url, @"https://vk\.(?:com|ru)/(?:games/)?(?<app>app\-?[0-9]+)(?>[\?\#].+)?$");
+        }
+
+        static bool IsMiniAppUrl(string url, out string appId)
+        {
+            var match = Regex.Match(url, @"https://vk\.(?:com|ru)/(?:games/)?(?<app>app\-?[0-9]+)(?>[\?\#].+)?$");
+            appId = match.Success ? match.Groups["app"].Value : null;
+            return match.Success;
         }
 
         static bool IsPlaylistUrl(string url)

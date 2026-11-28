@@ -18,5 +18,165 @@
             NavigationCompleted="WebView_OnNavigationCompleted"
             AutomationProperties.Name="Веб-просмотр приложения"
             AutomationProperties.HelpText="Компонент для отображения веб-контента внутри приложения" />
+
+        <!-- Диагностика: открыть DevTools WebView2 -->
+        <Button
+            x:Name="DevToolsButton"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Top"
+            Margin="0,8,8,0"
+            Padding="8,4"
+            FontSize="12"
+            Opacity="0.6"
+            Visibility="Collapsed"
+            Content="DevTools"
+            AutomationProperties.Name="Открыть инструменты разработчика"
+            Click="DevToolsButton_Click" />
+
+        <!-- Диагностика: журнал вызовов VK Bridge -->
+        <Button
+            x:Name="BridgeLogButton"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Top"
+            Margin="0,8,84,0"
+            Padding="8,4"
+            FontSize="12"
+            Opacity="0.6"
+            Visibility="Collapsed"
+            Content="Вызовы"
+            AutomationProperties.Name="Открыть журнал вызовов VK Bridge"
+            Click="BridgeLogButton_Click" />
+
+        <!-- Панель-инспектор вызовов моста -->
+        <Grid
+            x:Name="BridgeInspector"
+            Width="520"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Stretch"
+            Margin="0,44,8,8"
+            Visibility="Collapsed"
+            Background="{ThemeResource LayerFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" Margin="12,8,8,4">
+                <TextBlock
+                    Text="Вызовы VK Bridge"
+                    Style="{StaticResource BodyStrongTextBlockStyle}"
+                    VerticalAlignment="Center" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="4">
+                    <Button
+                        x:Name="ClearCallsButton"
+                        Padding="8,2"
+                        FontSize="11"
+                        Content="Очистить"
+                        Click="ClearCallsButton_Click" />
+                    <Button
+                        x:Name="CloseInspectorButton"
+                        Padding="8,2"
+                        FontSize="11"
+                        Content="✕"
+                        Click="CloseInspectorButton_Click" />
+                </StackPanel>
+            </Grid>
+
+            <TextBlock
+                x:Name="UnhandledCounter"
+                Grid.Row="1"
+                Margin="12,0,8,6"
+                FontSize="11"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Text="неподдержанных: 0" />
+
+            <ListView
+                x:Name="CallsList"
+                Grid.Row="2"
+                Margin="8,0,8,8"
+                SelectionMode="Single"
+                ItemsSource="{Binding BridgeCalls}">
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="local:BridgeCallEntry">
+                        <StackPanel Padding="0,4" Spacing="2">
+                            <TextBlock
+                                Text="{x:Bind Summary, Mode=OneWay}"
+                                FontFamily="Consolas"
+                                FontSize="12" />
+                            <TextBlock
+                                Text="{x:Bind Params, Mode=OneWay}"
+                                FontFamily="Consolas"
+                                FontSize="10"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                TextTrimming="CharacterEllipsis"
+                                MaxLines="2"
+                                TextWrapping="Wrap" />
+                            <TextBlock
+                                Text="{x:Bind Details, Mode=OneWay}"
+                                FontFamily="Consolas"
+                                FontSize="10"
+                                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                TextTrimming="CharacterEllipsis"
+                                MaxLines="3"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+
+            <TextBlock
+                Grid.Row="3"
+                Margin="12,0,12,8"
+                FontSize="10"
+                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                TextWrapping="Wrap"
+                Text="Показываются все вызовы моста: метод, параметры и результат." />
+        </Grid>
+
+        <!-- Индикатор загрузки -->
+        <ProgressRing
+            x:Name="LoadingRing"
+            Width="48"
+            Height="48"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            IsActive="True" />
+
+        <!-- Панель ошибки загрузки -->
+        <StackPanel
+            x:Name="ErrorPanel"
+            Width="420"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Spacing="8"
+            Visibility="Collapsed">
+            <FontIcon
+                FontSize="36"
+                Glyph="&#xE783;"
+                HorizontalAlignment="Center"
+                Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+            <TextBlock
+                x:Name="ErrorTitle"
+                HorizontalAlignment="Center"
+                TextAlignment="Center"
+                Style="{StaticResource SubtitleTextBlockStyle}" />
+            <TextBlock
+                x:Name="ErrorDetailsText"
+                HorizontalAlignment="Center"
+                TextAlignment="Center"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Style="{StaticResource CaptionTextBlockStyle}" />
+            <Button
+                x:Name="RetryButton"
+                HorizontalAlignment="Center"
+                Margin="0,8,0,0"
+                Content="Повторить"
+                Click="RetryButton_Click" />
+        </StackPanel>
     </Grid>
 </Page>

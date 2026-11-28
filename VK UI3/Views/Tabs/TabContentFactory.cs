@@ -120,6 +120,23 @@ namespace VK_UI3.Views.Tabs
             });
         }
 
+        /// <summary>
+        /// Мини-приложение VK (vk.ru/appXXXX), открываемое в WebView2 с мостом VkBridge.
+        /// </summary>
+        public static TabContent MiniApp(string appId, string webviewUrl, string header, string glyph)
+        {
+            return new TabContent(
+                new TabKey(SectionType.MiniApp, appId),
+                string.IsNullOrWhiteSpace(header) ? "Мини-приложение" : header,
+                string.IsNullOrWhiteSpace(glyph) ? "\uE774" : glyph,
+                tab =>
+                {
+                    var viewModel = new MiniAppViewModel(appId, webviewUrl);
+                    tab.NavigationParameter = viewModel;
+                    tab.ContentFrame.Navigate(typeof(MiniAppView), viewModel, new DrillInNavigationTransitionInfo());
+                });
+        }
+
         /// <summary>Создание плейлиста (открывается страницей вместо диалога).</summary>
         public static TabContent CreatePlaylist(CreatePlayList page)
         {
@@ -154,6 +171,7 @@ namespace VK_UI3.Views.Tabs
             SectionType.UserPlayListList => "Плейлисты",
             SectionType.PlayList => "Плейлист",
             SectionType.WhatListening => "Что слушают",
+            SectionType.MiniApp => "Мини-приложение",
             _ => "Раздел"
         };
 
@@ -168,6 +186,7 @@ namespace VK_UI3.Views.Tabs
             SectionType.UserPlayListList => "\uE93C",
             SectionType.PlayList => "\uE189",
             SectionType.WhatListening => "\uE783",
+            SectionType.MiniApp => "\uE774",
             _ => "\uE10F"
         };
 
@@ -215,11 +234,51 @@ namespace VK_UI3.Views.Tabs
                 case SectionType.None when tab.Key.Id == "settings":
                     Settings().Navigate(tab);
                     return;
+
+                case SectionType.MiniApp when !string.IsNullOrEmpty(tab.Key.Id):
+                    // webview_url не сохраняется в сессии — перезапрашиваем по appId.
+                    var appId = tab.Key.Id;
+                    _ = RestoreMiniAppAsync(tab, appId);
+                    return;
             }
 
             var wait = new WaitParameters { sectionType = tab.Key.Type, SectionID = tab.Key.Id };
             tab.NavigationParameter = wait;
             tab.ContentFrame.Navigate(typeof(WaitView), wait, new DrillInNavigationTransitionInfo());
+        }
+
+        /// <summary>
+        /// Восстанавливает вкладку мини-приложения: заново запрашивает webview_url по appId.
+        /// </summary>
+        private static async System.Threading.Tasks.Task RestoreMiniAppAsync(TabEntry tab, string appId)
+        {
+            string webviewUrl = null;
+
+            try
+            {
+                var vkService = MusicX.Services.StaticService.Container
+                    .GetService(typeof(MusicX.Core.Services.VkService)) as MusicX.Core.Services.VkService;
+
+                if (vkService != null)
+                {
+                    var response = await vkService.GetMiniApp(appId, $"https://vk.ru/{appId}");
+                    webviewUrl = response?.Object?.WebviewUrl;
+
+                    if (string.IsNullOrEmpty(webviewUrl))
+                        webviewUrl = response?.EmbeddedUri?.ViewUrl;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[TabContentFactory] Не удалось восстановить мини-приложение {appId}: {ex.Message}");
+            }
+
+            // Фолбэк: стандартный адрес приложения — мост поднимется сам.
+            if (string.IsNullOrEmpty(webviewUrl))
+                webviewUrl = $"https://vk.ru/{appId}";
+
+            MiniApp(appId, webviewUrl, tab.Header, tab.Glyph).Navigate(tab);
         }
 
         #endregion

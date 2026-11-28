@@ -171,7 +171,7 @@ namespace VK_UI3.Controls
 
 
             // 2. Исправляем создание MixOptions
-            var mixOptions = new VK_UI3.VKs.IVK.MixOptions(mixId, EntityId: _button.EntityId.ToString());
+            var mixOptions = new VK_UI3.VKs.IVK.MixOptions(mixId, EntityId: _button.EntityId);
             new MixAudio(mixOptions, this.DispatcherQueue);
         }
     }

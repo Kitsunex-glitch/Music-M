@@ -1,8 +1,11 @@
 using MusicX.Core.Models;
+using MusicX.Services;
 using System;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using VK_UI3.Views;
+using VK_UI3.VKs;
 using static VK_UI3.Views.SectionView;
 
 namespace VK_UI3.Helpers
@@ -20,6 +23,10 @@ namespace VK_UI3.Helpers
 
             try
             {
+                // Мини-приложения VK (vk.ru/appXXXX) открываются в WebView2 с мостом.
+                if (TryOpenMiniAppAsync(item.Url, item.Name))
+                    return true;
+
                 return item.Type switch
                 {
                     ContentType.Playlist => TryOpenPlaylist(item.Url),
@@ -37,9 +44,59 @@ namespace VK_UI3.Helpers
         }
 
         /// <summary>
+        /// Пытается открыть мини-приложение VK (vk.ru/appXXXX) в WebView2 с мостом.
+        /// Возвращает true, если URL распознан как мини-приложение (загрузка идёт асинхронно).
+        /// </summary>
+        private static bool TryOpenMiniAppAsync(string url, string title)
+        {
+            if (!IsMiniAppUrl(url, out var appId))
+                return false;
+
+            _ = OpenMiniAppCoreAsync(appId, url, title);
+            return true;
+        }
+
+        private static async Task OpenMiniAppCoreAsync(string appId, string url, string title)
+        {
+            string webviewUrl = null;
+
+            try
+            {
+                var vkService = VK.vkService;
+                var response = await vkService.GetMiniApp(appId, url);
+                webviewUrl = response?.Object?.WebviewUrl;
+
+                if (string.IsNullOrEmpty(webviewUrl))
+                    webviewUrl = response?.EmbeddedUri?.ViewUrl;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[VkNavigationHelper] Ошибка открытия мини-приложения {appId}: {ex.Message}");
+            }
+
+            // VK отдаёт webview_url не для всех приложений (например, для игр),
+            // поэтому в крайнем случае открываем стандартный адрес приложения —
+            // мини-приложение само поднимется через мост.
+            if (string.IsNullOrEmpty(webviewUrl))
+                webviewUrl = $"https://vk.ru/{appId}";
+
+            MainView.OpenMiniApp(
+                appId,
+                webviewUrl,
+                string.IsNullOrWhiteSpace(title) ? "Мини-приложение" : title);
+        }
+
+        private static bool IsMiniAppUrl(string url, out string appId)
+        {
+            var match = Regex.Match(url, @"https://vk\.(?:com|ru)/(?:games/)?(?<app>app\-?[0-9]+)(?>[\?\#].+)?$");
+            appId = match.Success ? match.Groups["app"].Value : null;
+            return match.Success;
+        }
+
+        /// <summary>
         /// Пытается открыть плейлист по URL вида:
         /// https://vk.ru/music/playlist/{ownerId}_{playlistId}_{accessKey}
-        /// https://vk.com/music/playlist/{ownerId}_{playlistId}_{accessKey}
+        /// https://vk.ru/music/playlist/{ownerId}_{playlistId}_{accessKey}
         /// </summary>
         private static bool TryOpenPlaylist(string url)
         {
@@ -57,11 +114,11 @@ namespace VK_UI3.Helpers
 
         /// <summary>
         /// Пытается открыть альбом по URL вида:
-        /// https://vk.com/music/album/{ownerId}_{albumId}_{accessKey}
+        /// https://vk.ru/music/album/{ownerId}_{albumId}_{accessKey}
         /// </summary>
         private static bool TryOpenAlbum(string url)
         {
-            // Формат: https://vk.com/music/album/12345_67890_abc123
+            // Формат: https://vk.ru/music/album/12345_67890_abc123
             if (!IsAlbumUrl(url))
                 return false;
 
@@ -76,11 +133,11 @@ namespace VK_UI3.Helpers
         /// <summary>
         /// Пытается открыть артиста по URL вида:
         /// https://vk.ru/artist/{artistId}
-        /// https://vk.com/artist/{artistId}
+        /// https://vk.ru/artist/{artistId}
         /// </summary>
         private static bool TryOpenArtist(string url)
         {
-            // Формат: https://vk.ru/artist/SomeArtistName или https://vk.com/artist/SomeArtistName
+            // Формат: https://vk.ru/artist/SomeArtistName или https://vk.ru/artist/SomeArtistName
             var uri = new Uri(url);
             var segments = uri.Segments;
 

@@ -74,7 +74,9 @@ namespace VkNet.Utils
 				IsSuccess = true,
 				StatusCode = httpStatusCode,
 				RequestUri = requestUri,
-				ResponseUri = requestUri
+				// Важно: сохраняем реальный адрес ответа (Location при редиректе),
+				// иначе теряется фрагмент #access_token=... при OAuth-авторизации.
+				ResponseUri = responseUri ?? requestUri
 			};
 		}
 

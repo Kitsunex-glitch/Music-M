@@ -103,7 +103,9 @@ namespace VkNet.Utils
             }
 
             var requestUri = response.RequestMessage?.RequestUri;
-            var responseUri = response.Headers.Location;
+            // Location (заголовок редиректа) в приоритете: в нём бывает #access_token=...
+            // Если редирект уже отработан HttpClient, берём финальный адрес запроса.
+            var responseUri = response.Headers.Location ?? response.RequestMessage?.RequestUri;
 
             return response.IsSuccessStatusCode
                 ? HttpResponse<string>.Success(response.StatusCode, content, requestUri, responseUri)

@@ -137,7 +137,7 @@ namespace VK_UI3.Views
                     if (audioPlaylistOriginal == null)
                         audioPlaylistOriginal = playlist;
 
-                    if (!playlist.Permissions.Edit)
+                    if (playlist.Permissions == null || !playlist.Permissions.Edit)
                     {
                         stackPanel.Items.Remove(EditPlaylist);
 
@@ -160,8 +160,13 @@ namespace VK_UI3.Views
                             });
                     }
 
-                    if (!playlist.Permissions.Follow && (playlist.OwnerId != AccountsDB.activeAccount.id || (playlist.Original == null)))
-                        stackPanel.Items.Remove(AddPlaylist);
+                    bool canFollow = playlist?.Permissions?.Follow ?? false;
+                    long? currentUserId = AccountsDB.activeAccount?.id;
+
+                    if (!canFollow && (playlist?.OwnerId != currentUserId || playlist?.Original == null))
+                    {
+                        stackPanel?.Items.Remove(AddPlaylist);
+                    }
                     else
                     {
                         if (playlist.IsFollowing && !playlist.Permissions.Edit)
@@ -239,7 +244,7 @@ namespace VK_UI3.Views
                     FollowersText.Visibility = Visibility.Visible;
                     FollowersText.Text = $"{playlist.Followers} подписчиков";
 
-                    if (playlist.Genres.Count == 0)
+                    if (playlist.Genres == null || playlist.Genres.Count == 0)
                     {
                         Genres.Visibility = Visibility.Collapsed;
                     }

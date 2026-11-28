@@ -1368,12 +1368,263 @@ namespace MusicX.Core.Services
                 throw;
             }
         }
+        private static readonly string[] MiniAppFields =
+        {
+            "has_vk_connect",
+            "is_vkui_internal",
+            "webview_url",
+            "screen_orientation",
+            "mobile_controls_type",
+            "splash_screen",
+            "background_loader_color",
+            "placeholder_info",
+            "hide_tabbar",
+            "track_code",
+            "author_owner_id",
+            "preload_ad_types",
+            "ad_config",
+            "can_cache",
+            "icon_75",
+            "icon_139",
+            "icon_150",
+            "icon_576",
+            "need_show_unverified_screen",
+            "is_in_catalog"
+        };
+
+        public async Task<ResolveScreenNameResponse> GetMiniApp(string appId, string url)
+        {
+            var normalizedUrl = string.IsNullOrWhiteSpace(url) ? null : url;
+            var deviceId = await _deviceIdStore.GetDeviceIdAsync();
+            var numericAppId = ParseAppId(appId);
+
+            // 1. Сначала пробуем получить подписанную ссылку для десктопного веба (platform = "web")
+            if (numericAppId > 0)
+            {
+                try
+                {
+                    var embeddedParams = new VkParameters
+                    {
+                        {"app_id", numericAppId},
+                        {"platform", "web"},
+                        {"v", "5.199"}
+                    };
+
+                    var rawEmbedded = await apiInvoke.InvokeAsync("apps.getEmbeddedUrl", embeddedParams);
+                    LogMiniApp($"apps.getEmbeddedUrl(web) appId={appId} raw={rawEmbedded}");
+
+                    var parsedEmbedded = DeserializeMiniApp(rawEmbedded);
+                    if (!string.IsNullOrEmpty(parsedEmbedded?.EmbeddedUri?.ViewUrl) ||
+                        !string.IsNullOrEmpty(parsedEmbedded?.Object?.WebviewUrl))
+                    {
+                        return parsedEmbedded;
+                    }
+                }
+                catch (Exception e)
+                {
+                    LogMiniApp($"apps.getEmbeddedUrl(web) appId={appId} ERROR {e.GetType().Name}: {e.Message}");
+                }
+            }
+
+            // 2. Если apps.getEmbeddedUrl не вернул ссылку — пробуем apps.get с platform = "web"
+            try
+            {
+                var parameters = new VkParameters
+                {
+                    {"app_id", numericAppId},
+                    {"platform", "web"}, // было "android"
+                    {"extended", true},
+                    {"v", "5.199"}
+                };
+
+                var raw = await apiInvoke.InvokeAsync("apps.get", parameters);
+                LogMiniApp($"apps.get(web) appId={appId} raw={raw}");
+
+                var fromAppsGet = ParseAppsGet(raw, appId);
+                if (fromAppsGet != null && (!string.IsNullOrEmpty(fromAppsGet.Object?.WebviewUrl) ||
+                                            !string.IsNullOrEmpty(fromAppsGet.EmbeddedUri?.ViewUrl)))
+                {
+                    return fromAppsGet;
+                }
+            }
+            catch (Exception e)
+            {
+                LogMiniApp($"apps.get(web) appId={appId} ERROR {e.GetType().Name}: {e.Message}");
+            }
+
+            // 3. Fallback на ваш текущий код с execute.resolveScreenName (если метод выше недоступен для данного токена)
+            var attempts = new List<(string Name, string Method, VkParameters Parameters)>
+            {
+                ("execute.resolveScreenName/func_v=23",
+                    "execute.resolveScreenName",
+                    BuildResolveParameters(appId, normalizedUrl, "23", MiniAppFields, deviceId)),
+                ("execute.resolveScreenName/func_v=14",
+                    "execute.resolveScreenName",
+                    BuildResolveParameters(appId, normalizedUrl, "14", MiniAppFields, deviceId)),
+                ("execute.resolveScreenName/no-func_v",
+                    "execute.resolveScreenName",
+                    BuildResolveParameters(appId, normalizedUrl, null, MiniAppFields, deviceId)),
+            };
+
+            ResolveScreenNameResponse model = null;
+            Exception lastError = null;
+
+            foreach (var attempt in attempts)
+            {
+                try
+                {
+                    var raw = await apiInvoke.InvokeAsync(attempt.Method, attempt.Parameters);
+                    LogMiniApp($"{attempt.Name} appId={appId} raw={raw}");
+
+                    var parsed = DeserializeMiniApp(raw);
+                    if (parsed != null)
+                    {
+                        model ??= parsed;
+                        if (!string.IsNullOrEmpty(parsed.Object?.WebviewUrl) ||
+                            !string.IsNullOrEmpty(parsed.EmbeddedUri?.ViewUrl))
+                            return parsed;
+                    }
+                }
+                catch (Exception e)
+                {
+                    lastError = e;
+                    LogMiniApp($"{attempt.Name} appId={appId} ERROR {e.GetType().Name}: {e.Message}");
+                    logger.Error(e);
+                }
+            }
+
+            if (model == null && lastError != null)
+                throw lastError;
+
+            return model ?? new ResolveScreenNameResponse("mini_app", 0, null, null);
+        }
+
+
+        private VkParameters BuildResolveParameters(string appId, string url, string funcV,
+            IEnumerable<string> appFields, string deviceId)
+        {
+            var parameters = new VkParameters
+            {
+                {"device_id", deviceId},
+                {"screen_name", appId},
+                // Явная версия API: без неё execute.resolveScreenName может
+                // не возвращать webview_url.
+                {"v", "5.199"}
+            };
+
+            if (funcV != null)
+                parameters["func_v"] = funcV;
+
+            if (!string.IsNullOrEmpty(url))
+                parameters["url"] = url;
+
+            if (appFields != null)
+                parameters["app_fields"] = string.Join(",", appFields);
+
+            return parameters;
+        }
+
+        private static ResolveScreenNameResponse DeserializeMiniApp(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw) || raw.Trim() == "{}")
+                return null;
+
+            try
+            {
+                var settings = new JsonSerializerSettings
+                {
+                    ContractResolver = new Newtonsoft.Json.Serialization.DefaultContractResolver
+                    {
+                        NamingStrategy = new Newtonsoft.Json.Serialization.SnakeCaseNamingStrategy()
+                    }
+                };
+
+                return JsonConvert.DeserializeObject<ResolveScreenNameResponse>(raw, settings);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Разбирает ответ apps.get (массив приложений) в привычную модель,
+        /// подставляя webview_url/иконки, если они там есть.
+        /// </summary>
+        private static ResolveScreenNameResponse ParseAppsGet(string raw, string appId)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+                return null;
+
+            try
+            {
+                var root = JObject.Parse(raw);
+                var items = root["response"]?["items"] as JArray ?? root["response"] as JArray;
+                var item = items?.FirstOrDefault();
+                if (item == null)
+                    return null;
+
+                string Str(string name) => item[name]?.Type == JTokenType.Null ? null : item[name]?.ToString();
+
+                var id = int.TryParse(Str("id"), out var parsedId) ? parsedId : 0;
+
+                var resolved = new ResolvedObject(
+                    "mini_app",
+                    id,
+                    Str("title"),
+                    0,
+                    int.TryParse(Str("author_owner_id"), out var owner) ? owner : 0,
+                    Str("track_code"),
+                    Str("webview_url"),
+                    0,
+                    Str("icon_139"),
+                    Str("icon_150"),
+                    Str("icon_278"),
+                    Str("icon_576"),
+                    Str("icon_75"),
+                    false,
+                    false,
+                    null,
+                    0,
+                    false,
+                    null);
+
+                return new ResolveScreenNameResponse("mini_app", id, resolved, null);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static readonly object MiniAppLogLock = new();
+
+        private static void LogMiniApp(string line)
+        {
+            try
+            {
+                var logPath = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "MusicMMKZ", "miniapp-getapp.log");
+                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(logPath)!);
+                lock (MiniAppLogLock)
+                {
+                    System.IO.File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] {line}\n");
+                }
+            }
+            catch
+            {
+                // лог — не критично
+            }
+        }
+
         public async Task<AppLaunchParamsResponse> GetMiniAppLaunchParams(long appId)
         {
             var parameters = new VkParameters
             {
                 {"device_id", await _deviceIdStore.GetDeviceIdAsync()},
                 {"mini_app_id", appId},
+                {"platform", "web"},
                 {"referer", "recs"}
             };
 
@@ -1389,6 +1640,160 @@ namespace MusicX.Core.Services
                 logger.Error(e);
                 throw;
             }
+        }
+
+        /// <summary>
+        /// Разрешает приложение через execute.resolveScreenName и возвращает «сырой» ответ VK
+        /// (с webview_url, embedded_uri.view_url и access_token игры) без потери полей
+        /// при десериализации в модель.
+        /// </summary>
+        public async Task<JObject> ResolveMiniAppRawAsync(string appId, string url)
+        {
+            try
+            {
+                var parameters = new VkParameters
+                {
+                    {"device_id", await _deviceIdStore.GetDeviceIdAsync()},
+                    {"screen_name", appId},
+                    {"func_v", 23},
+                    {"v", "5.199"},
+                    {"app_fields", string.Join(",", MiniAppFields)}
+                };
+
+                if (!string.IsNullOrWhiteSpace(url))
+                    parameters["url"] = url;
+
+                var raw = await apiInvoke.InvokeAsync("execute.resolveScreenName", parameters);
+                LogMiniApp($"ResolveMiniAppRawAsync appId={appId} raw={raw}");
+
+                return string.IsNullOrWhiteSpace(raw) ? null : JObject.Parse(raw);
+            }
+            catch (Exception e)
+            {
+                logger.Error(e);
+                LogMiniApp($"ResolveMiniAppRawAsync appId={appId} ERROR {e.GetType().Name}: {e.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Получает access_token мини-приложения. Для игр (html5) токен уже лежит
+        /// в embedded_uri.view_url; для обычных мини-приложений — в webview_url.
+        /// Если токена нет — пробуем apps.getAppLaunchParams, затем oauth/authorize.
+        /// </summary>
+        public async Task<string> GetMiniAppTokenAsync(string appId, string sourceUrl, string scope)
+        {
+            var raw = await ResolveMiniAppRawAsync(appId, $"https://vk.ru/{appId}");
+
+            var candidates = new[]
+            {
+                raw?["embedded_uri"]?["view_url"]?.ToString(),
+                raw?["embedded_uri"]?["original_url"]?.ToString(),
+                raw?["object"]?["webview_url"]?.ToString(),
+                sourceUrl
+            };
+
+            foreach (var candidate in candidates)
+            {
+                var token = TryExtractAccessToken(candidate);
+                if (!string.IsNullOrEmpty(token))
+                {
+                    LogMiniApp($"GetMiniAppTokenAsync appId={appId} token from URL");
+                    return token;
+                }
+            }
+
+            // apps.getAppLaunchParams иногда содержит токен настроек приложения.
+            try
+            {
+                var appIdNumber = ParseAppId(appId);
+                var launchParams = await GetMiniAppLaunchParams(appIdNumber);
+
+                if (!string.IsNullOrEmpty(launchParams?.VkAccessTokenSettings))
+                {
+                    LogMiniApp($"GetMiniAppTokenAsync appId={appId} token from launch params");
+                    return launchParams.VkAccessTokenSettings;
+                }
+            }
+            catch (Exception e)
+            {
+                LogMiniApp($"GetMiniAppTokenAsync launch params failed: {e.GetType().Name}: {e.Message}");
+            }
+
+            // Последняя попытка — oauth/authorize с source_url мини-приложения.
+            var webviewUrl = raw?["object"]?["webview_url"]?.ToString();
+            var oauthSource = !string.IsNullOrEmpty(webviewUrl)
+                ? webviewUrl
+                : raw?["embedded_uri"]?["view_url"]?.ToString() ?? sourceUrl;
+
+            var response = await GetMiniAppCredentialToken(oauthSource, scope);
+            LogMiniApp($"GetMiniAppTokenAsync appId={appId} token from oauth");
+
+            return response.AccessToken;
+        }
+
+        /// <summary>Достаёт access_token из URL (query или fragment).</summary>
+        private static string TryExtractAccessToken(string url)
+        {
+            if (string.IsNullOrEmpty(url))
+                return null;
+
+            try
+            {
+                var uri = new Uri(url);
+
+                var token = ExtractParam(uri.Query, "access_token");
+                if (!string.IsNullOrEmpty(token))
+                    return token;
+
+                if (!string.IsNullOrEmpty(uri.Fragment))
+                    return ExtractParam("?" + uri.Fragment.TrimStart('#'), "access_token");
+            }
+            catch
+            {
+                // некорректный URL — игнорируем
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Безопасно достаёт параметр из query-строки (без исключений на пустых значениях).
+        /// </summary>
+        private static string ExtractParam(string query, string key)
+        {
+            if (string.IsNullOrEmpty(query) || query == "?")
+                return null;
+
+            var trimmed = query.StartsWith('?') ? query[1..] : query;
+
+            foreach (var pair in trimmed.Split('&'))
+            {
+                var eq = pair.IndexOf('=');
+                if (eq <= 0)
+                    continue;
+
+                if (!pair.AsSpan(0, eq).Equals(key, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var value = pair[(eq + 1)..];
+                return string.IsNullOrEmpty(value) ? null : Uri.UnescapeDataString(value);
+            }
+
+            return null;
+        }
+
+        /// <summary>Преобразует «app12345» / «12345» в long.</summary>
+        public static long ParseAppId(string appId)
+        {
+            if (string.IsNullOrEmpty(appId))
+                return 0;
+
+            var digits = appId.StartsWith("app", StringComparison.OrdinalIgnoreCase)
+                ? appId[3..]
+                : appId;
+
+            return long.TryParse(digits, out var parsed) ? parsed : 0;
         }
 
         public async Task<CredentialResponse> GetMiniAppCredentialToken(string sourceUrl, string scope)
@@ -1411,10 +1816,11 @@ namespace MusicX.Core.Services
             {
                 var response = await _restClient.PostAsync(new("https://api.vk.ru/oauth/authorize"), parameters, Encoding.UTF8);
 
-                if (!response.ResponseUri.Fragment.StartsWith("#access_token="))
+                var fragment = response.ResponseUri?.Fragment;
+                if (string.IsNullOrEmpty(fragment) || !fragment.StartsWith("#access_token="))
                     throw new VkApiException("Access token not found");
 
-                var query = Url.ParseQueryString("?" + response.ResponseUri.Fragment[1..]);
+                var query = Url.ParseQueryString("?" + fragment[1..]);
                 return new CredentialResponse(query["access_token"]);
             }
             catch (Exception e)
